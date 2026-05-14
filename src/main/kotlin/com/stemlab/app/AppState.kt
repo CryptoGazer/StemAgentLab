@@ -24,6 +24,7 @@ data class ProjectViewState(
     val currentPhase: Phase = Phase.IDLE,
     val metrics: Metrics = Metrics(),
     val candidates: List<CandidateAgent> = emptyList(),
+    val dismissedCandidateIds: Set<String> = emptySet(),
     val selectedTools: List<ToolSpec> = emptyList(),
     val logs: List<String> = emptyList(),
     val lastResult: EvolutionResult? = null,

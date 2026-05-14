@@ -240,7 +240,13 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        CandidateListPanel(candidates = activeProject?.candidates.orEmpty(), modifier = Modifier.weight(0.42f))
+                        CandidateListPanel(
+                            candidates = activeProject?.let { project ->
+                                project.candidates.filterNot { it.id in project.dismissedCandidateIds }
+                            }.orEmpty(),
+                            onDismissRejected = controller::dismissRejectedCandidate,
+                            modifier = Modifier.weight(0.42f)
+                        )
                         EvolutionLogPanel(logs = activeProject?.logs.orEmpty(), modifier = Modifier.weight(0.58f))
                     }
                 }

@@ -129,6 +129,7 @@ class AppController(
                 spec = updatedSpec,
                 metrics = Metrics(),
                 candidates = emptyList(),
+                dismissedCandidateIds = emptySet(),
                 selectedTools = emptyList(),
                 lastResult = null,
                 lastExportPath = null,
@@ -203,6 +204,7 @@ class AppController(
                             estimatedCost = resultWithLogs.totalCost
                         ),
                         candidates = resultWithLogs.candidates,
+                        dismissedCandidateIds = emptySet(),
                         selectedTools = selectedTools,
                         lastResult = resultWithLogs,
                         statusMessage = if (selected != null)
@@ -242,6 +244,24 @@ class AppController(
 
     fun stopEvolution(projectId: String) {
         projectJobs.remove(projectId)?.cancel()
+    }
+
+    fun dismissRejectedCandidate(candidateId: String) {
+        val project = _state.value.activeProject ?: return
+        dismissRejectedCandidate(project.id, candidateId)
+    }
+
+    fun dismissRejectedCandidate(projectId: String, candidateId: String) {
+        updateProject(projectId) { project ->
+            val candidate = project.candidates.firstOrNull { it.id == candidateId } ?: return@updateProject project
+            if (candidate.status != com.stemlab.core.model.CandidateStatus.REJECTED || candidate.id == "baseline") {
+                return@updateProject project
+            }
+            project.copy(
+                dismissedCandidateIds = project.dismissedCandidateIds + candidateId,
+                statusMessage = "Dismissed ${candidate.config.name} from the candidate view."
+            )
+        }
     }
 
     fun runFinalEvaluation() {
@@ -357,7 +377,7 @@ class AppController(
     }
 
     private fun resetLogs(projectId: String) {
-        updateProject(projectId) { it.copy(logs = emptyList(), isRunning = true) }
+        updateProject(projectId) { it.copy(logs = emptyList(), isRunning = true, dismissedCandidateIds = emptySet()) }
     }
 
     private fun setPhase(projectId: String, phase: Phase, status: String? = null) {

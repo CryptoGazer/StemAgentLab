@@ -9,6 +9,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,7 +27,11 @@ import com.stemlab.core.model.CandidateStatus
 import com.stemlab.ui.theme.*
 
 @Composable
-fun CandidateListPanel(candidates: List<CandidateAgent>, modifier: Modifier = Modifier) {
+fun CandidateListPanel(
+    candidates: List<CandidateAgent>,
+    onDismissRejected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
     PanelCard(title = "Candidate Agents", modifier = modifier) {
         if (candidates.isEmpty()) {
             Text("No candidates yet — run the evolution loop.", color = OnSurfaceDim, fontSize = 13.sp)
@@ -35,8 +43,8 @@ fun CandidateListPanel(candidates: List<CandidateAgent>, modifier: Modifier = Mo
                     modifier = Modifier.fillMaxSize().padding(end = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(candidates) { candidate ->
-                        CandidateRow(candidate)
+                    items(candidates, key = { it.id }) { candidate ->
+                        CandidateRow(candidate, onDismissRejected)
                     }
                 }
                 VerticalScrollbar(
@@ -49,12 +57,21 @@ fun CandidateListPanel(candidates: List<CandidateAgent>, modifier: Modifier = Mo
 }
 
 @Composable
-private fun CandidateRow(candidate: CandidateAgent) {
+private fun CandidateRow(
+    candidate: CandidateAgent,
+    onDismissRejected: (String) -> Unit
+) {
     val borderColor = when (candidate.status) {
         CandidateStatus.SELECTED -> SuccessGreen
         CandidateStatus.EVALUATING -> AccentCyan
-        CandidateStatus.REJECTED -> SurfaceVariant
+        CandidateStatus.REJECTED -> WarningAmber.copy(alpha = 0.45f)
         CandidateStatus.PENDING -> SurfaceVariant
+    }
+    val progressColor = when (candidate.status) {
+        CandidateStatus.SELECTED -> SuccessGreen
+        CandidateStatus.EVALUATING -> AccentCyan
+        CandidateStatus.REJECTED -> WarningAmber
+        CandidateStatus.PENDING -> OnSurfaceDim
     }
     val badgeText = when (candidate.status) {
         CandidateStatus.SELECTED -> "✓ SELECTED"
@@ -65,8 +82,10 @@ private fun CandidateRow(candidate: CandidateAgent) {
     val badgeColor = when (candidate.status) {
         CandidateStatus.SELECTED -> SuccessGreen
         CandidateStatus.EVALUATING -> AccentCyan
-        else -> OnSurfaceDim
+        CandidateStatus.REJECTED -> WarningAmber
+        CandidateStatus.PENDING -> OnSurfaceDim
     }
+    val canDismiss = candidate.status == CandidateStatus.REJECTED && candidate.id != "baseline"
 
     Column(
         modifier = Modifier
@@ -82,7 +101,25 @@ private fun CandidateRow(candidate: CandidateAgent) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(candidate.config.name, color = OnSurface, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            Text(badgeText, color = badgeColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(badgeText, color = badgeColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (canDismiss) {
+                    IconButton(
+                        onClick = { onDismissRejected(candidate.id) },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Hide rejected candidate",
+                            tint = OnSurfaceDim,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
         }
 
         if (candidate.score > 0.0) {
@@ -95,7 +132,7 @@ private fun CandidateRow(candidate: CandidateAgent) {
                 LinearProgressIndicator(
                     progress = { candidate.score.toFloat().coerceIn(0f, 1f) },
                     modifier = Modifier.weight(1f).height(6.dp).clip(RoundedCornerShape(3.dp)),
-                    color = borderColor,
+                    color = progressColor,
                     trackColor = SurfaceDark
                 )
                 Spacer(Modifier.width(10.dp))

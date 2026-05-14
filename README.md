@@ -99,6 +99,86 @@ The workflow passes this secret to macOS and Windows jobs.
 
 ---
 
+## Install After Downloading From GitHub
+
+There are two supported ways to use the app on another machine.
+
+### Option A: Run From Source
+
+Use this when the other person is a developer or is comfortable with a terminal.
+
+1. Install JDK 21.
+2. Clone or download the repository.
+3. Open a terminal in the repository root.
+4. Configure `OPENAI_API_KEY`.
+5. Run the app with the Gradle wrapper.
+
+macOS / Linux:
+
+```bash
+git clone <repo-url>
+cd StemAgentLab
+printf '%s\n' 'OPENAI_API_KEY=sk-...' > .env
+chmod 600 .env
+./gradlew run
+```
+
+Windows PowerShell:
+
+```powershell
+git clone <repo-url>
+cd StemAgentLab
+'OPENAI_API_KEY=sk-...' | Out-File -Encoding ascii .env
+.\gradlew.bat run
+```
+
+For this source-based workflow, `.env` is the easiest local setup because the working directory is the repository root.
+
+### Option B: Install A Native Package
+
+Use this when you want a normal desktop app install.
+
+Build the package first, or download it from GitHub Actions artifacts if CI has produced one.
+
+macOS DMG:
+
+```bash
+./gradlew packageDmg
+```
+
+Windows MSI:
+
+```powershell
+.\gradlew.bat packageMsi
+```
+
+Package outputs:
+
+```text
+build/compose/binaries/main/dmg/
+build\compose\binaries\main\msi\
+```
+
+For installed DMG/MSI apps, prefer a user-level environment variable instead of `.env`. A double-clicked desktop app may not start with the repository root as its working directory, so a project-root `.env` is mainly for `./gradlew run`.
+
+macOS:
+
+```bash
+launchctl setenv OPENAI_API_KEY "sk-..."
+```
+
+Then restart the app. If the variable is not visible to GUI apps yet, log out and log back in.
+
+Windows PowerShell:
+
+```powershell
+[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "sk-...", "User")
+```
+
+Then close and reopen the app or terminal.
+
+---
+
 ## Run The App
 
 ### macOS / Linux
