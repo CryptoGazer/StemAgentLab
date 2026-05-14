@@ -22,6 +22,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -203,6 +204,10 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                                     onApply = controller::updateActiveProject
                                 )
                                 MetricsPanel(metrics = activeProject.metrics)
+                                OutputFilesPanel(
+                                    frozenAgentPath = activeProject.frozenAgent?.let { "projects/${it.projectId}/agent.json" },
+                                    reportPath = activeProject.lastExportPath
+                                )
                                 ToolRegistryPanel(tools = activeProject.selectedTools, modifier = Modifier.weight(0.66f))
                             }
                         }
@@ -645,6 +650,40 @@ private fun ProjectRow(
         }
         Spacer(Modifier.height(3.dp))
         Text(project.domain, color = OnSurfaceDim, fontSize = 11.sp)
+    }
+}
+
+@Composable
+private fun OutputFilesPanel(
+    frozenAgentPath: String?,
+    reportPath: String?,
+    modifier: Modifier = Modifier
+) {
+    if (frozenAgentPath == null && reportPath == null) return
+    PanelCard(title = "Output Files", modifier = modifier) {
+        SelectionContainer {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (frozenAgentPath != null) {
+                    OutputFileRow(label = "Frozen agent", path = frozenAgentPath)
+                }
+                if (reportPath != null) {
+                    OutputFileRow(label = "Report", path = reportPath)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OutputFileRow(label: String, path: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, color = OnSurfaceDim, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+        Text(
+            path,
+            color = AccentCyan,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
     }
 }
 

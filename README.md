@@ -1,63 +1,47 @@
 # Stem Agent Lab
 
-Stem Agent Lab is a Kotlin Compose Desktop prototype for a controlled **stem-agent specialisation loop**.
+Kotlin Compose Desktop prototype of a controlled **stem-agent specialisation loop**.
 
-The application is not a chatbot. It is a small lab UI where you create evaluation projects, run a baseline agent, ask OpenAI to propose specialised candidate agents, evaluate those candidates on generated benchmark tasks, and freeze the best configuration by measurable score/cost trade-off.
+This is not a chatbot. It is a small lab where you create evaluation projects, run a baseline agent, ask OpenAI to propose specialised candidates, evaluate those candidates on generated benchmark tasks, and freeze the best configuration by measurable score/cost trade-off.
 
-In practical terms:
+How it works:
 
-1. You create or select a project, such as `Python QA`, `SQL Optimizer`, or `TypeScript Review`.
-2. The app asks OpenAI to generate benchmark tasks for that project domain.
+1. Create or select a project — `Python QA`, `SQL Optimizer`, `TypeScript Review`, anything.
+2. The app asks OpenAI to generate benchmark tasks for that domain.
 3. A baseline agent is evaluated first.
 4. A StemAgent asks OpenAI for three candidate configurations.
-5. Candidate agents are evaluated in parallel with a concurrency limit.
-6. `VersionManager` selects the best candidate by `score² / cost`.
-7. The UI shows logs, metrics, selected tools, candidates, and exported reports.
+5. Candidates are evaluated in parallel (concurrency limit: 2).
+6. `VersionManager` selects the best by `score² / cost`.
+7. The winning config is saved to `projects/<id>/agent.json`. A markdown report goes to `reports/`.
 
-The current version is **OpenAI-backed only**. There is no no-key mock runtime mode.
+**OpenAI API key is required.** There is no offline mode.
 
 ---
 
 ## Requirements
 
-| Tool | Required |
-|------|----------|
-| JDK | 21+ recommended |
-| Gradle | Provided by `gradlew` / `gradlew.bat` |
-| OpenAI API key | Required |
-| Python 3 | Optional; only relevant for future live tool execution |
+| Tool | Version |
+|------|---------|
+| JDK | 21+ |
+| Gradle | via `gradlew` / `gradlew.bat` |
+| OpenAI API key | required |
 
-The project uses:
-
-- Kotlin `2.3.10`
-- Compose Multiplatform Desktop `1.11.0`
-- JVM toolchain `21`
-- Ktor CIO client for OpenAI HTTP calls
-- kotlinx.serialization for local JSON storage
+Stack: Kotlin 2.3.10 · Compose Multiplatform Desktop 1.11.0 · JVM toolchain 21 · Ktor CIO · kotlinx.serialization
 
 ---
 
 ## OpenAI Key Setup
 
-The app always requires `OPENAI_API_KEY`.
+The app loads `OPENAI_API_KEY` from the environment first, then from a `.env` file in the project root. `.env` is gitignored and should never be committed.
 
-It loads the key in this order:
-
-1. Environment variable `OPENAI_API_KEY`
-2. Local `.env` file in the project root
-
-`.env` is gitignored and should never be committed.
-
-### macOS / Linux
-
-One terminal session:
+**macOS / Linux — one session:**
 
 ```bash
 export OPENAI_API_KEY=sk-...
 ./gradlew run
 ```
 
-Persistent local dev setup:
+**macOS / Linux — persistent `.env`:**
 
 ```bash
 printf '%s\n' 'OPENAI_API_KEY=sk-...' > .env
@@ -65,243 +49,92 @@ chmod 600 .env
 ./gradlew run
 ```
 
-### Windows PowerShell
-
-One PowerShell session:
+**Windows PowerShell — one session:**
 
 ```powershell
 $env:OPENAI_API_KEY="sk-..."
 .\gradlew.bat run
 ```
 
-Persistent local dev setup:
+**Windows PowerShell — persistent `.env`:**
 
 ```powershell
 'OPENAI_API_KEY=sk-...' | Out-File -Encoding ascii .env
 .\gradlew.bat run
 ```
 
-### GitHub Actions
-
-CI expects a repository secret named:
-
-```text
-OPENAI_API_KEY
-```
-
-Set it in GitHub:
-
-```text
-Repository Settings -> Secrets and variables -> Actions -> New repository secret
-```
-
-The workflow passes this secret to macOS and Windows jobs.
+**GitHub Actions:** add a repository secret named `OPENAI_API_KEY` under Settings → Secrets and variables → Actions. The workflow passes it to both macOS and Windows jobs.
 
 ---
 
-## Install After Downloading From GitHub
-
-There are two supported ways to use the app on another machine.
-
-### Option A: Run From Source
-
-Use this when the other person is a developer or is comfortable with a terminal.
-
-1. Install JDK 21.
-2. Clone or download the repository.
-3. Open a terminal in the repository root.
-4. Configure `OPENAI_API_KEY`.
-5. Run the app with the Gradle wrapper.
-
-macOS / Linux:
+## Run
 
 ```bash
-git clone <repo-url>
-cd StemAgentLab
-printf '%s\n' 'OPENAI_API_KEY=sk-...' > .env
-chmod 600 .env
-./gradlew run
+./gradlew run          # macOS / Linux
+.\gradlew.bat run      # Windows
 ```
 
-Windows PowerShell:
-
-```powershell
-git clone <repo-url>
-cd StemAgentLab
-'OPENAI_API_KEY=sk-...' | Out-File -Encoding ascii .env
-.\gradlew.bat run
-```
-
-For this source-based workflow, `.env` is the easiest local setup because the working directory is the repository root.
-
-### Option B: Install A Native Package
-
-Use this when you want a normal desktop app install.
-
-Build the package first, or download it from GitHub Actions artifacts if CI has produced one.
-
-macOS DMG:
-
-```bash
-./gradlew packageDmg
-```
-
-Windows MSI:
-
-```powershell
-.\gradlew.bat packageMsi
-```
-
-Package outputs:
-
-```text
-build/compose/binaries/main/dmg/
-build\compose\binaries\main\msi\
-```
-
-For installed DMG/MSI apps, prefer a user-level environment variable instead of `.env`. A double-clicked desktop app may not start with the repository root as its working directory, so a project-root `.env` is mainly for `./gradlew run`.
-
-macOS:
-
-```bash
-launchctl setenv OPENAI_API_KEY "sk-..."
-```
-
-Then restart the app. If the variable is not visible to GUI apps yet, log out and log back in.
-
-Windows PowerShell:
-
-```powershell
-[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "sk-...", "User")
-```
-
-Then close and reopen the app or terminal.
-
----
-
-## Run The App
-
-### macOS / Linux
-
-```bash
-./gradlew run
-```
-
-### Windows
-
-```powershell
-.\gradlew.bat run
-```
-
-If the key is missing, startup fails with a clear `OPENAI_API_KEY is required` error.
+If the key is missing, startup fails immediately with `OPENAI_API_KEY is required`.
 
 ---
 
 ## Basic Usage
 
-### 1. Create or select a project
+### Create or select a project
 
-Use either:
+Use the project dropdown (top-right) or the **Projects** panel on the left. The default project is `Python QA`.
 
-- the project dropdown in the top-right corner;
-- the `Projects` panel on the left.
+Click `+ New Project` to create one. Fill in:
+- **Name** — display label in the UI
+- **Domain** — what OpenAI uses to generate tasks and candidate strategies
+- **Description** — local notes, optional
 
-The default project is `Python QA`.
+### Edit project details
 
-Click `+ New Project` to create another project. A project has:
+The **Project Details** panel. Click **Apply** to save. Changing the domain resets metrics and candidates for that project, since the benchmark changes with the domain. Apply does not call OpenAI.
 
-- `Project name`: display name in the UI;
-- `Domain`: what OpenAI uses to generate tasks and candidate strategies;
-- `Description`: local notes.
+### Run evolution
 
-### 2. Edit project details
+Click **Run Evolution**. The app will:
 
-Use the `Project Details` panel.
-
-Click `Apply` to save name/domain/description. This updates `projects/index.json` and resets old metrics/candidates for that project, because a changed domain means a new benchmark context.
-
-`Apply` does not call OpenAI. OpenAI is called only when you run the evolution loop.
-
-### 3. Run evolution
-
-Click `Run Evolution`.
-
-The app will:
-
-1. Generate evaluation tasks for the active project domain.
-2. Run the baseline agent.
-3. Ask StemAgent to propose three candidates.
+1. Generate evaluation tasks for the domain via OpenAI.
+2. Evaluate the baseline agent.
+3. Ask StemAgent to propose three candidate configs.
 4. Evaluate candidates in parallel.
-5. Select the best candidate.
-6. Save a run JSON file.
+5. Select the best candidate and save the run.
 
-Logs appear in the `Evolution Log` panel. The log panel auto-scrolls and has a visible scrollbar.
+Progress streams to the **Evolution Log** panel.
 
-### 4. Run projects in parallel
+### Run multiple projects in parallel
 
-Different projects can run at the same time.
+Different projects can run simultaneously. Switch between them; logs, metrics, and candidates stay separate per project.
 
-Example:
+### Inspect the frozen agent
 
-1. Start `Python QA`.
-2. Switch to `SQL Review`.
-3. Start `SQL Review`.
-4. Switch between projects and verify that logs, candidates, metrics, and selected tools stay separate.
+After evolution, the winning config is locked as `projects/<projectId>/agent.json`. The **Frozen Agent** panel shows the score, improvement over baseline, tools, skills, strategy, and the file path. The path is selectable — you can copy it directly from the panel.
 
-The same project cannot be started twice at the same time.
+The **Output Files** panel (left column) shows both the frozen agent path and the report path once they exist.
 
-### 5. Inspect the frozen agent
+### Re-evaluate the frozen agent
 
-After evolution completes and a candidate wins, the app **freezes** it as a persistent artifact:
+**⟳ Eval Frozen** reruns the frozen config on a fresh task set without starting a new evolution cycle. Useful for checking whether the selected configuration holds up beyond the original benchmark tasks. Results appear in the log.
 
-```text
-projects/<projectId>/agent.json
-```
+### Export a report
 
-The **Frozen Agent** panel (right column, centre) shows:
-
-| Field | Description |
-|-------|-------------|
-| Name | Winning candidate name |
-| Domain | Project domain |
-| Score | Evaluation score on benchmark tasks |
-| vs Baseline | Percentage improvement over the baseline agent |
-| Tokens / Cost | Resource usage during this run |
-| Strategy | Prompt strategy (e.g. `chain-of-thought`) |
-| Tools | Tool IDs selected for this agent |
-| Skills | Skill IDs selected for this agent |
-| Frozen at | UTC timestamp when the config was locked |
-
-The frozen config persists across restarts. Switching to a previously run project reloads the panel automatically.
-
-### 6. Re-evaluate the frozen agent
-
-Click **⟳ Eval Frozen** to run the frozen agent on a fresh set of benchmark tasks **without** starting a new propose–evaluate cycle. This verifies that the selected configuration generalises beyond the tasks it was originally scored on. The results appear in the evolution log.
-
-### 7. Export a report
-
-After a run finishes, click `Export Report`.
-
-Reports are saved under:
-
-```text
-projects/<projectId>/reports/report-<runId>.md
-```
-
-Reports are Markdown files assembled by `MarkdownReportExporter` from the saved run data. During export, the app also makes one OpenAI call to generate a short human-readable `Human Summary` section. The metrics, candidate table, safeguards, and logs remain deterministic output from the saved `EvolutionResult`.
+Click **↓ Export Report** after a run. The report is a Markdown file saved to `reports/report-<runId>.md`. During export, one additional OpenAI call generates a short human-readable summary section. The rest of the report (metrics, candidate table, safeguards, log) is assembled from the saved run data without calling the API.
 
 ---
 
-## Current Pipeline
+## Pipeline
 
 ```text
 ProjectSpec(name, domain, description)
         ↓
-LlmTaskGenerator -> OpenAI task JSON
+LlmTaskGenerator → OpenAI task JSON
         ↓
-BaselineAgent -> OpenAI analysis
+BaselineAgent → OpenAI analysis
         ↓
-StemAgent -> OpenAI candidate AgentConfig JSON
+StemAgent → OpenAI candidate AgentConfig JSON
         ↓
 Candidate A/B/C evaluation in parallel
         ↓
@@ -309,148 +142,89 @@ ScoreCalculator keyword matching
         ↓
 VersionManager selects best by score² / cost
         ↓
-ProjectStore saves run
+ProjectStore saves run + agent.json
         ↓
 MarkdownReportExporter writes report
 ```
-
-Candidate evaluation is bounded by:
-
-```kotlin
-Budget(maxParallelCandidates = 2)
-```
-
-OpenAI requests retry on HTTP `429` and transient `5xx` responses. If OpenAI sends `Retry-After`, the client waits accordingly.
 
 ---
 
 ## Local Storage
 
-This project does **not** use SQLite or a database.
-
-It uses local JSON files:
+No database. Local JSON files only:
 
 ```text
 projects/
 ├── index.json
 ├── python-qa/
+│   ├── agent.json          ← frozen agent config
 │   ├── runs/
 │   │   └── <runId>.json
 │   └── reports/
 │       └── report-<runId>.md
 └── sql-review/
+    ├── agent.json
     ├── runs/
     └── reports/
 ```
 
 `projects/` is gitignored.
 
-Storage hardening currently includes:
-
-- safe project id validation;
-- safe run id validation;
-- canonical path checks against path traversal;
-- synchronized project store operations inside one JVM process;
-- input length limits for project name/domain/description.
-
-Note: two separate app processes writing the same `projects/index.json` at the same time are not fully protected. That would require file locking or SQLite.
+The project store validates IDs, checks canonical paths against traversal, synchronises writes within one JVM process, and enforces input length limits. Two separate processes writing the same `projects/index.json` simultaneously are not protected — that would require file locking or a database.
 
 ---
 
-## Build And Test
-
-### macOS / Linux
+## Build and Test
 
 ```bash
-./gradlew test
+./gradlew test         # macOS / Linux
 ./gradlew build
-```
 
-### Windows PowerShell
-
-```powershell
-.\gradlew.bat test
+.\gradlew.bat test     # Windows
 .\gradlew.bat build
 ```
 
-Tests include:
-
-- scoring and selection logic;
-- parser behavior;
-- project storage;
-- project creation/update flows;
-- bounded parallel candidate evaluation;
-- prompt-domain hardening;
-- live OpenAI smoke tests.
-
-Because live OpenAI tests call the API, `OPENAI_API_KEY` must be configured before running the full test suite.
+Tests cover scoring and selection logic, JSON parsing, project storage, candidate evaluation, and prompt hardening. Live OpenAI smoke tests also run when `OPENAI_API_KEY` is set — they hit the real API, so expect a small cost.
 
 ---
 
 ## Native Packages
 
-### macOS DMG
+**macOS DMG:**
 
 ```bash
 ./gradlew packageDmg
+# output: build/compose/binaries/main/dmg/
 ```
 
-The DMG appears under:
+If packaging fails, install Xcode command-line tools first: `xcode-select --install`
 
-```text
-build/compose/binaries/main/dmg/
-```
-
-If packaging fails because macOS tooling is missing, install Xcode command-line tools:
-
-```bash
-xcode-select --install
-```
-
-### Windows MSI
-
-Run on Windows or in GitHub Actions:
+**Windows MSI** (run on Windows or in CI):
 
 ```powershell
 .\gradlew.bat packageMsi
+# output: build\compose\binaries\main\msi\
 ```
 
-The MSI appears under:
-
-```text
-build\compose\binaries\main\msi\
-```
-
-The repository includes a GitHub Actions Windows job that runs tests and builds the MSI on `windows-latest`.
-
-### Linux DEB
+**Linux DEB:**
 
 ```bash
 ./gradlew packageDeb
 ```
 
+For installed DMG/MSI builds, set `OPENAI_API_KEY` as a user-level environment variable rather than relying on `.env` — a double-clicked desktop app may not start in the repository root.
+
+macOS: `launchctl setenv OPENAI_API_KEY "sk-..."` then restart the app.  
+Windows: `[Environment]::SetEnvironmentVariable("OPENAI_API_KEY", "sk-...", "User")` then reopen the app.
+
 ---
 
 ## CI/CD
 
-GitHub Actions workflow:
+`.github/workflows/build.yml` runs two jobs:
 
-```text
-.github/workflows/build.yml
-```
-
-Current jobs:
-
-- macOS:
-  - verify `OPENAI_API_KEY`;
-  - run `./gradlew test`;
-  - build DMG;
-  - upload DMG artifact.
-- Windows:
-  - verify `OPENAI_API_KEY`;
-  - run `.\gradlew.bat test`;
-  - build MSI;
-  - upload MSI artifact.
+- **macOS** — verify key, run tests, build DMG, upload artifact
+- **Windows** — verify key, run tests, build MSI, upload artifact
 
 ---
 
@@ -460,14 +234,14 @@ Current jobs:
 src/main/kotlin/com/stemlab/
 ├── Main.kt
 ├── app/
-│   ├── AppController.kt       # project orchestration and running jobs
-│   └── AppState.kt            # UI state, project view state, metrics
+│   ├── AppController.kt       orchestration and coroutine jobs
+│   └── AppState.kt            UI state, metrics, project view state
 ├── core/
-│   ├── agent/                 # BaselineAgent, StemAgent, SpecializedAgent
-│   ├── eval/                  # Evaluator, PythonQaEvaluator, ScoreCalculator
-│   ├── evolution/             # EvolutionEngine, VersionManager, StopCriteria
-│   ├── model/                 # ProjectSpec, AgentConfig, CandidateAgent, EvalTask, ...
-│   └── registry/              # ToolRegistry, SkillRegistry
+│   ├── agent/                 BaselineAgent, StemAgent, SpecializedAgent
+│   ├── eval/                  PythonQaEvaluator, ScoreCalculator
+│   ├── evolution/             EvolutionEngine, VersionManager, StopCriteria
+│   ├── model/                 ProjectSpec, AgentConfig, CandidateAgent, EvalTask …
+│   └── registry/              ToolRegistry, SkillRegistry
 ├── llm/
 │   ├── LlmClient.kt
 │   ├── OpenAiLlmClient.kt
@@ -476,9 +250,7 @@ src/main/kotlin/com/stemlab/
 │   └── MarkdownReportExporter.kt
 ├── storage/
 │   ├── JsonStorage.kt
-│   ├── ProjectStore.kt
-│   └── RunHistoryStore.kt     # legacy global run store
-├── tools/
+│   └── ProjectStore.kt
 └── ui/
     ├── StemAgentLabApp.kt
     ├── components/
@@ -489,40 +261,12 @@ src/main/kotlin/com/stemlab/
 
 ## Troubleshooting
 
-### `OPENAI_API_KEY is required`
+**`OPENAI_API_KEY is required`** — set the key via environment variable or `.env`.
 
-Set the key through an environment variable or `.env`.
+**IDE shows unresolved Kotlin references** — trust Gradle first: `./gradlew compileKotlin`. The IntelliJ Kotlin plugin can lag behind the Gradle Kotlin version and show false-positive errors.
 
-### The IDE shows unresolved Kotlin references
+**JVM / SLF4J warnings on startup** — non-fatal. The app starts normally despite these.
 
-Trust Gradle first:
+**Window closes to tray instead of quitting** — use the tray menu Quit, or stop the Gradle process.
 
-```bash
-./gradlew compileKotlin
-```
-
-Some IntelliJ/Kotlin plugin combinations show false-positive unresolved references when the IDE plugin version lags behind the Gradle Kotlin version.
-
-### JVM or SLF4J warnings appear on startup
-
-Current macOS runs can print warnings about restricted native access from Gradle/Skiko and a missing SLF4J provider. These warnings are non-fatal; the app can still start normally.
-
-### The app closes to tray instead of quitting
-
-Closing the window hides it to the system tray. Use the tray menu `Quit` or stop the Gradle process from the terminal.
-
-### Project data looks stale
-
-Project data is local. To reset all app data from the UI, use `Reset All`.
-
-Manual cleanup:
-
-```bash
-rm -rf projects
-```
-
-On Windows PowerShell:
-
-```powershell
-Remove-Item -Recurse -Force projects
-```
+**Stale project data** — use **Reset All** in the UI, or manually: `rm -rf projects` (macOS/Linux) / `Remove-Item -Recurse -Force projects` (Windows PowerShell).

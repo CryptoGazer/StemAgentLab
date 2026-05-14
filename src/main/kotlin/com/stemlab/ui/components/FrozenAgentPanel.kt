@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -98,6 +100,22 @@ private fun FrozenAgentBody(agent: FrozenAgent) {
     // Frozen timestamp
     val shortTs = agent.frozenAt.take(19).replace('T', ' ')
     Text("Frozen at: $shortTs", color = OnSurfaceDim, fontSize = 10.sp)
+
+    Spacer(Modifier.height(6.dp))
+    HorizontalDivider(color = SurfaceVariant)
+    Spacer(Modifier.height(6.dp))
+
+    // Saved artifact path — selectable for copy/paste
+    Text("Saved to:", color = OnSurfaceDim, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(2.dp))
+    SelectionContainer {
+        Text(
+            "projects/${agent.projectId}/agent.json",
+            color = AccentCyan,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
 }
 
 @Composable

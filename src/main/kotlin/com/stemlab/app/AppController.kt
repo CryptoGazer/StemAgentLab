@@ -86,21 +86,11 @@ class AppController(
     fun deleteProject(projectId: String) {
         projectJobs.remove(projectId)?.cancel()
         projectStore.deleteProject(projectId)
-
         val remaining = _state.value.projects.filterNot { it.id == projectId }
-        if (remaining.isNotEmpty()) {
-            _state.update { state ->
-                state.copy(
-                    projects = remaining,
-                    activeProjectId = remaining.firstOrNull()?.id
-                )
-            }
-        } else {
-            val project = defaultProject()
-            projectStore.saveProject(project)
-            _state.value = AppState(
-                projects = listOf(project.toViewState()),
-                activeProjectId = project.id
+        _state.update { state ->
+            state.copy(
+                projects = remaining,
+                activeProjectId = remaining.firstOrNull()?.id
             )
         }
     }
