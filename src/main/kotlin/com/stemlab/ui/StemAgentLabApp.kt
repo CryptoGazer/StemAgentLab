@@ -1,13 +1,18 @@
 package com.stemlab.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -71,8 +76,15 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
 
     AppTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = SurfaceDark) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val outerScrollState = rememberScrollState()
+                val mainContentHeight = (maxHeight - 156.dp).coerceAtLeast(560.dp)
             Column(
-                modifier = Modifier.fillMaxSize().padding(16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = maxHeight)
+                    .verticalScroll(outerScrollState)
+                    .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 // ─── Header ───────────────────────────────────────────────
@@ -86,7 +98,12 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                         Text("Controlled agent specialisation loop", color = OnSurfaceDim, fontSize = 12.sp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        activeProject?.let { ProjectBadge(it.name) }
+                        ProjectSelector(
+                            projects = state.projects,
+                            activeProjectId = state.activeProjectId,
+                            onSelect = controller::selectProject,
+                            onNewProject = { showNewProjectDialog = true }
+                        )
                     }
                 }
 
@@ -189,7 +206,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
 
                 // ─── Main content ──────────────────────────────────────────
                 Row(
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier.fillMaxWidth().height(mainContentHeight),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     // Left column: settings + metrics + tools
@@ -226,6 +243,61 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                     }
                 }
             }
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(outerScrollState),
+                    modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectSelector(
+    projects: List<com.stemlab.app.ProjectViewState>,
+    activeProjectId: String?,
+    onSelect: (String) -> Unit,
+    onNewProject: () -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val activeProject = projects.firstOrNull { it.id == activeProjectId } ?: projects.firstOrNull()
+
+    Box {
+        OutlinedButton(
+            onClick = { expanded = true },
+            border = BorderStroke(1.dp, PrimaryGreen.copy(alpha = 0.65f)),
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = SuccessGreen)
+        ) {
+            Text(activeProject?.name ?: "Projects", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = CardBackground
+        ) {
+            projects.forEach { project ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(project.name, color = OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(project.domain, color = OnSurfaceDim, fontSize = 11.sp)
+                        }
+                    },
+                    onClick = {
+                        onSelect(project.id)
+                        expanded = false
+                    }
+                )
+            }
+            HorizontalDivider(color = SurfaceVariant)
+            DropdownMenuItem(
+                text = { Text("+ New Project", color = PrimaryGreen, fontSize = 13.sp, fontWeight = FontWeight.Bold) },
+                onClick = {
+                    expanded = false
+                    onNewProject()
+                }
+            )
         }
     }
 }
@@ -388,14 +460,25 @@ private fun ProjectMenuPanel(
             Text("Delete Selected", fontSize = 11.sp)
         }
         Spacer(Modifier.height(10.dp))
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxSize()) {
-            items(projects) { project ->
-                ProjectRow(
-                    project = project,
-                    selected = project.id == activeProjectId,
-                    onClick = { onSelect(project.id) }
-                )
+        val listState = rememberLazyListState()
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxSize().padding(end = 8.dp)
+            ) {
+                items(projects) { project ->
+                    ProjectRow(
+                        project = project,
+                        selected = project.id == activeProjectId,
+                        onClick = { onSelect(project.id) }
+                    )
+                }
             }
+            VerticalScrollbar(
+                adapter = rememberScrollbarAdapter(listState),
+                modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
+            )
         }
     }
 }

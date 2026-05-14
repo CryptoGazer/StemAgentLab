@@ -2,9 +2,11 @@ package com.stemlab.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -38,7 +40,11 @@ fun EvolutionLogPanel(logs: List<String>, modifier: Modifier = Modifier) {
                     .background(SurfaceDark)
                     .padding(8.dp)
             ) {
-                LazyColumn(state = listState, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                LazyColumn(
+                    state = listState,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier = Modifier.fillMaxSize().padding(end = 10.dp)
+                ) {
                     items(logs) { line ->
                         val color = when {
                             line.contains("Selected") || line.contains("complete") -> SuccessGreen
@@ -56,6 +62,10 @@ fun EvolutionLogPanel(logs: List<String>, modifier: Modifier = Modifier) {
                         )
                     }
                 }
+                VerticalScrollbar(
+                    adapter = rememberScrollbarAdapter(listState),
+                    modifier = Modifier.align(androidx.compose.ui.Alignment.CenterEnd).fillMaxHeight()
+                )
             }
         }
     }
