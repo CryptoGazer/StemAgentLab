@@ -7,6 +7,7 @@ import com.stemlab.core.registry.ToolRegistry
 import com.stemlab.core.tasks.LlmTaskGenerator
 import com.stemlab.llm.LlmClient
 import com.stemlab.llm.OpenAiLlmClient
+import com.stemlab.llm.PromptTemplates
 import com.stemlab.report.MarkdownReportExporter
 import com.stemlab.storage.ProjectStore
 import com.stemlab.util.DotEnvLoader
@@ -289,22 +290,62 @@ class AppController(
             return
         }
 
-        setPhase(project.id, Phase.EXPORTING, "Exporting report...")
-        val resultWithLogs = result.copy(logs = project.logs)
-        val path = MarkdownReportExporter.export(
-            resultWithLogs,
-            projectStore.reportPath(project.id, resultWithLogs.runId)
-        )
-        projectStore.saveRun(project.id, resultWithLogs)
-        appendLog(project.id, "Report exported -> $path")
         updateProject(project.id) {
             it.copy(
-                lastResult = resultWithLogs,
-                lastExportPath = path,
-                currentPhase = Phase.DONE,
+                currentPhase = Phase.EXPORTING,
                 isRunning = false,
-                statusMessage = "Report saved: $path"
+                statusMessage = "Exporting report with OpenAI summary..."
             )
+        }
+        appendLog(project.id, "Generating human report summary via OpenAI")
+        scope.launch {
+            try {
+                val baseResult = result.copy(logs = currentLogs(project.id))
+                val narrativeResponse = llmClient.complete(PromptTemplates.reportNarrative(baseResult))
+                val narrative = sanitizeReportNarrative(narrativeResponse.text)
+                appendLog(
+                    project.id,
+                    "Report summary generated (${narrativeResponse.tokensUsed} tokens, " +
+                        "$${"%.4f".format(narrativeResponse.costEstimate)})"
+                )
+                val resultWithReportUsage = baseResult.copy(
+                    totalTokensUsed = baseResult.totalTokensUsed + narrativeResponse.tokensUsed,
+                    totalCost = baseResult.totalCost + narrativeResponse.costEstimate,
+                    logs = currentLogs(project.id)
+                )
+                val path = MarkdownReportExporter.export(
+                    resultWithReportUsage,
+                    projectStore.reportPath(project.id, resultWithReportUsage.runId),
+                    narrative
+                )
+                projectStore.saveRun(project.id, resultWithReportUsage)
+                appendLog(project.id, "Report exported -> $path")
+                val resultWithExportLog = resultWithReportUsage.copy(logs = currentLogs(project.id))
+                projectStore.saveRun(project.id, resultWithExportLog)
+                updateProject(project.id) {
+                    it.copy(
+                        metrics = it.metrics.copy(
+                            estimatedTokens = resultWithExportLog.totalTokensUsed,
+                            estimatedCost = resultWithExportLog.totalCost
+                        ),
+                        lastResult = resultWithExportLog,
+                        lastExportPath = path,
+                        currentPhase = Phase.DONE,
+                        isRunning = false,
+                        statusMessage = "Report saved: $path"
+                    )
+                }
+            } catch (e: CancellationException) {
+                appendLog(project.id, "Report export cancelled")
+                updateProject(project.id) {
+                    it.copy(currentPhase = Phase.IDLE, isRunning = false, statusMessage = "Report export cancelled.")
+                }
+            } catch (e: Exception) {
+                appendLog(project.id, "ERROR: Report export failed: ${e.message ?: e::class.simpleName ?: "unknown error"}")
+                updateProject(project.id) {
+                    it.copy(currentPhase = Phase.IDLE, isRunning = false, statusMessage = "Report export failed — check logs.")
+                }
+            }
         }
     }
 
@@ -399,6 +440,12 @@ class AppController(
 
     private fun currentLogs(projectId: String): List<String> =
         _state.value.projects.firstOrNull { it.id == projectId }?.logs.orEmpty()
+
+    private fun sanitizeReportNarrative(value: String): String =
+        value
+            .replace(Regex("```+"), "")
+            .trim()
+            .take(2_500)
 
     private fun uniqueProjectId(name: String): String {
         val slug = name.lowercase()

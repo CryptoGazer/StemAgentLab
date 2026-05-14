@@ -99,6 +99,19 @@ class MarkdownReportExporterTest {
     }
 
     @Test
+    fun `buildReport contains human summary section`() {
+        val report = MarkdownReportExporter.buildReport(makeResult())
+        assertTrue(report.contains("Human Summary"), "Report must contain human summary section")
+    }
+
+    @Test
+    fun `buildReport includes provided llm narrative`() {
+        val narrative = "Candidate B is the best trade-off for this run."
+        val report = MarkdownReportExporter.buildReport(makeResult(), narrative)
+        assertTrue(report.contains(narrative), "Report must include the LLM-generated narrative")
+    }
+
+    @Test
     fun `export creates file on disk`() {
         val outPath = "build/test-reports/test-report.md"
         val result = makeResult()

@@ -260,6 +260,8 @@ Reports are saved under:
 projects/<projectId>/reports/report-<runId>.md
 ```
 
+Reports are Markdown files assembled by `MarkdownReportExporter` from the saved run data. During export, the app also makes one OpenAI call to generate a short human-readable `Human Summary` section. The metrics, candidate table, safeguards, and logs remain deterministic output from the saved `EvolutionResult`.
+
 ---
 
 ## Current Pipeline

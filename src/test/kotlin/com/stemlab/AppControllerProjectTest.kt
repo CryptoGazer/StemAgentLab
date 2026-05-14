@@ -44,6 +44,11 @@ class AppControllerProjectTest {
                 tokensUsed = 20,
                 costEstimate = 0.002
             )
+            prompt.contains("REPORT_NARRATIVE") -> LlmResponse(
+                "Candidate B gives the clearest improvement for this benchmark run.",
+                tokensUsed = 7,
+                costEstimate = 0.0007
+            )
             prompt.contains("TOOLS: (none)") -> LlmResponse("needs review", 10, 0.001)
             else -> LlmResponse("bug found", 20, 0.002)
         }
@@ -138,6 +143,34 @@ class AppControllerProjectTest {
                 assertEquals(100, project.lastResult?.totalTokensUsed)
                 assertEquals(0.01, project.lastResult?.totalCost ?: 0.0, absoluteTolerance = 0.0001)
             }
+        } finally {
+            controller.close()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `export report includes llm generated human summary`() = runBlocking {
+        val (controller, dir) = controller()
+        try {
+            controller.runEvolution()
+            repeat(50) {
+                if (controller.state.value.activeProject?.lastResult != null) return@repeat
+                delay(20)
+            }
+
+            controller.exportReport()
+            repeat(50) {
+                if (controller.state.value.activeProject?.lastExportPath != null) return@repeat
+                delay(20)
+            }
+
+            val project = controller.state.value.activeProject ?: error("No active project")
+            val exportPath = project.lastExportPath ?: error("No report was exported")
+            val report = File(exportPath).readText()
+            assertTrue(report.contains("Human Summary"))
+            assertTrue(report.contains("Candidate B gives the clearest improvement"))
+            assertEquals(107, project.lastResult?.totalTokensUsed)
         } finally {
             controller.close()
             dir.deleteRecursively()
