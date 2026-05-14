@@ -1,0 +1,72 @@
+[
+  {
+    "id": "task_001",
+    "description": "Find the bug in this Python division utility function.",
+    "code": "def divide(a, b):\n    return a / b\n\nresult = divide(10, 0)\nprint(result)",
+    "expectedIssueKeywords": [
+      "ZeroDivisionError",
+      "division by zero",
+      "check b != 0",
+      "zero denominator",
+      "raise ValueError",
+      "guard clause",
+      "b == 0"
+    ]
+  },
+  {
+    "id": "task_002",
+    "description": "Identify the off-by-one error in this list access function.",
+    "code": "def get_last(lst):\n    return lst[len(lst)]\n\nmy_list = [1, 2, 3]\nprint(get_last(my_list))",
+    "expectedIssueKeywords": [
+      "IndexError",
+      "off-by-one",
+      "index out of range",
+      "len(lst) - 1",
+      "last element",
+      "zero-indexed",
+      "lst[-1]"
+    ]
+  },
+  {
+    "id": "task_003",
+    "description": "Detect the mutable default argument anti-pattern in this append function.",
+    "code": "def append_to(element, to=[]):\n    to.append(element)\n    return to\n\nprint(append_to(1))\nprint(append_to(2))\nprint(append_to(3))",
+    "expectedIssueKeywords": [
+      "mutable default argument",
+      "shared state",
+      "None default",
+      "to=None",
+      "if to is None",
+      "evaluated once",
+      "side effect"
+    ]
+  },
+  {
+    "id": "task_004",
+    "description": "Find the type comparison bug in this user input validator.",
+    "code": "def check_answer(user_input):\n    correct = 42\n    if user_input == correct:\n        return True\n    return False\n\nprint(check_answer('42'))",
+    "expectedIssueKeywords": [
+      "type mismatch",
+      "string vs integer",
+      "int(user_input)",
+      "isinstance",
+      "type coercion",
+      "strict equality",
+      "type conversion"
+    ]
+  },
+  {
+    "id": "task_005",
+    "description": "Spot the missing None check in this string processing function.",
+    "code": "def get_length(s):\n    return len(s)\n\ndef process(data):\n    result = get_length(data['name'])\n    return result * 2\n\nprocess({'age': 30})",
+    "expectedIssueKeywords": [
+      "None check",
+      "KeyError",
+      "AttributeError",
+      "missing key",
+      "data.get('name')",
+      "NoneType",
+      "defensive check"
+    ]
+  }
+]

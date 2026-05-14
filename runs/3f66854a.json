@@ -1,0 +1,102 @@
+{
+    "runId": "3f66854a",
+    "domain": "Python QA",
+    "baselineScore": 0.2857142857142857,
+    "candidates": [
+        {
+            "id": "baseline",
+            "config": {
+                "id": "baseline",
+                "name": "Baseline Agent",
+                "tools": [],
+                "skills": [
+                    "direct_reasoning"
+                ],
+                "maxTokens": 500
+            },
+            "score": 0.2857142857142857,
+            "estimatedCost": 0.0018,
+            "estimatedTokens": 900,
+            "status": "REJECTED"
+        },
+        {
+            "id": "candidate_a",
+            "config": {
+                "id": "candidate_a",
+                "name": "Candidate A",
+                "tools": [
+                    "code_reader",
+                    "static_analyzer"
+                ],
+                "skills": [
+                    "direct_reasoning",
+                    "edge_case_reasoning"
+                ],
+                "promptStrategy": "tool_augmented",
+                "maxTokens": 800
+            },
+            "score": 0.5714285714285714,
+            "estimatedCost": 0.005599999999999999,
+            "estimatedTokens": 2800,
+            "status": "REJECTED"
+        },
+        {
+            "id": "candidate_b",
+            "config": {
+                "id": "candidate_b",
+                "name": "Candidate B",
+                "tools": [
+                    "code_reader",
+                    "test_generator",
+                    "python_runner",
+                    "failure_analyzer"
+                ],
+                "skills": [
+                    "direct_reasoning",
+                    "edge_case_reasoning",
+                    "test_driven_analysis",
+                    "root_cause_analysis"
+                ],
+                "promptStrategy": "tool_augmented",
+                "maxTokens": 1200
+            },
+            "score": 0.8571428571428571,
+            "estimatedCost": 0.0094,
+            "estimatedTokens": 4700,
+            "status": "SELECTED"
+        },
+        {
+            "id": "candidate_c",
+            "config": {
+                "id": "candidate_c",
+                "name": "Candidate C",
+                "tools": [
+                    "code_reader",
+                    "test_generator",
+                    "python_runner",
+                    "patch_suggester",
+                    "failure_analyzer"
+                ],
+                "skills": [
+                    "direct_reasoning",
+                    "edge_case_reasoning",
+                    "test_driven_analysis",
+                    "root_cause_analysis",
+                    "patch_suggestion"
+                ],
+                "promptStrategy": "tool_augmented",
+                "maxTokens": 1500
+            },
+            "score": 0.8571428571428571,
+            "estimatedCost": 0.0113,
+            "estimatedTokens": 5650,
+            "status": "REJECTED"
+        }
+    ],
+    "selectedCandidateId": "candidate_b",
+    "improvement": 0.5714285714285714,
+    "totalTokensUsed": 14050,
+    "totalCost": 0.028099999999999993,
+    "logs": [],
+    "timestamp": "2026-05-14T13:05:32.867629Z"
+}

@@ -1,0 +1,92 @@
+{
+  "runId": "demo-run-001",
+  "domain": "Python QA",
+  "baselineScore": 0.314,
+  "candidates": [
+    {
+      "id": "baseline",
+      "config": {
+        "id": "baseline",
+        "name": "Baseline Agent",
+        "tools": [],
+        "skills": ["direct_reasoning"],
+        "promptStrategy": "direct",
+        "maxTokens": 500
+      },
+      "score": 0.314,
+      "estimatedCost": 0.0032,
+      "estimatedTokens": 1600,
+      "status": "REJECTED"
+    },
+    {
+      "id": "candidate_a",
+      "config": {
+        "id": "candidate_a",
+        "name": "Candidate A",
+        "tools": ["code_reader", "static_analyzer"],
+        "skills": ["direct_reasoning", "edge_case_reasoning"],
+        "promptStrategy": "tool_augmented",
+        "maxTokens": 800
+      },
+      "score": 0.543,
+      "estimatedCost": 0.0068,
+      "estimatedTokens": 3400,
+      "status": "REJECTED"
+    },
+    {
+      "id": "candidate_b",
+      "config": {
+        "id": "candidate_b",
+        "name": "Candidate B",
+        "tools": ["code_reader", "test_generator", "python_runner", "failure_analyzer"],
+        "skills": ["direct_reasoning", "edge_case_reasoning", "test_driven_analysis", "root_cause_analysis"],
+        "promptStrategy": "tool_augmented",
+        "maxTokens": 1200
+      },
+      "score": 0.857,
+      "estimatedCost": 0.0094,
+      "estimatedTokens": 4700,
+      "status": "SELECTED"
+    },
+    {
+      "id": "candidate_c",
+      "config": {
+        "id": "candidate_c",
+        "name": "Candidate C",
+        "tools": ["code_reader", "test_generator", "python_runner", "patch_suggester", "failure_analyzer"],
+        "skills": ["direct_reasoning", "edge_case_reasoning", "test_driven_analysis", "root_cause_analysis", "patch_suggestion"],
+        "promptStrategy": "tool_augmented",
+        "maxTokens": 1500
+      },
+      "score": 0.771,
+      "estimatedCost": 0.0152,
+      "estimatedTokens": 7600,
+      "status": "REJECTED"
+    }
+  ],
+  "selectedCandidateId": "candidate_b",
+  "improvement": 0.543,
+  "totalTokensUsed": 17300,
+  "totalCost": 0.0346,
+  "logs": [
+    "[00:00] Evolution started — domain: Python QA",
+    "[00:01] Loaded 5 evaluation tasks from dataset",
+    "[00:02] Running Baseline Agent on 5 tasks...",
+    "[00:04] Baseline score: 0.314 (avg keyword match)",
+    "[00:05] StemAgent proposing candidate configurations...",
+    "[00:06] Generated 3 candidates: A (code_reader+static), B (full stack), C (full stack+patch)",
+    "[00:07] Evaluating Candidate A...",
+    "[00:09] Candidate A score: 0.543 — improvement +0.229",
+    "[00:10] Evaluating Candidate B...",
+    "[00:13] Candidate B score: 0.857 — improvement +0.543",
+    "[00:14] Evaluating Candidate C...",
+    "[00:17] Candidate C score: 0.771 — cost ratio lower than B",
+    "[00:18] VersionManager selecting best candidate...",
+    "[00:18] Selected: Candidate B (score=0.857, cost=$0.0094, ratio=91.17)",
+    "[00:19] Rejected: Candidate A (score below threshold vs B)",
+    "[00:19] Rejected: Candidate C (worse score/cost ratio than B)",
+    "[00:20] SpecializedAgent frozen with Candidate B configuration",
+    "[00:20] Evolution complete — improvement: +172.6%"
+  ],
+  "timestamp": "2026-05-14T12:00:00Z"
+}

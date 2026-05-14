@@ -41,5 +41,11 @@ bin/
 ### VS Code ###
 .vscode/
 
+CLAUDE.md
+
 ### Mac OS ###
 .DS_Store
+
+### Local secrets — NEVER commit ###
+.env
+.env.local

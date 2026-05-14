@@ -1,0 +1,27 @@
+[
+  {
+    "id": "direct_reasoning",
+    "name": "Direct Reasoning",
+    "description": "Uses the LLM's built-in knowledge to reason about code without invoking external tools."
+  },
+  {
+    "id": "edge_case_reasoning",
+    "name": "Edge Case Reasoning",
+    "description": "Systematically considers boundary values, empty inputs, type mismatches, and overflow conditions."
+  },
+  {
+    "id": "test_driven_analysis",
+    "name": "Test-Driven Analysis",
+    "description": "Generates and runs tests to empirically verify hypotheses about code behaviour."
+  },
+  {
+    "id": "root_cause_analysis",
+    "name": "Root Cause Analysis",
+    "description": "Traces observed failures back to their fundamental source rather than treating symptoms."
+  },
+  {
+    "id": "patch_suggestion",
+    "name": "Patch Suggestion",
+    "description": "Proposes minimal, correct code changes that fix the identified issue without introducing regressions."
+  }
+]

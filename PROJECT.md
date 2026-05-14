@@ -1,0 +1,437 @@
+# Stem Agent Lab — Project Reference
+
+> Comprehensive technical reference for developers, agents, and reviewers.  
+> Read this before making changes or handing the project to another agent.
+
+---
+
+## 1. What This Project Is
+
+**Stem Agent Lab** is a Kotlin Compose Multiplatform Desktop application that demonstrates a controlled _stem agent specialisation loop_:
+
+```
+Domain input
+    ↓
+Baseline agent evaluated on benchmark tasks
+    ↓
+StemAgent proposes 3 candidate configurations (A / B / C)
+    ↓
+Each candidate evaluated on same benchmark tasks
+    ↓
+VersionManager selects winner by score² / cost ratio
+    ↓
+SpecializedAgent frozen with winning configuration
+    ↓
+UI shows before/after metrics + logs
+    ↓
+Export → reports/report-<runId>.md
+```
+
+The agent does **not** rewrite source code. It generates and evaluates `AgentConfig` objects — structured data specifying tools, skills, prompt strategy, and token budget.
+
+---
+
+## 2. Technology Stack
+
+| Component | Version |
+|-----------|---------|
+| Kotlin | 2.3.10 |
+| Compose Multiplatform Desktop | 1.11.0 |
+| Gradle (Kotlin DSL) | 9.2.0 |
+| JVM toolchain | 21 (compatible with JDK 24) |
+| kotlinx.serialization | 1.8.1 |
+| kotlinx.coroutines | 1.10.2 |
+| ktor (CIO engine) | 3.1.3 |
+| kotlin.test + coroutines-test | bundled |
+
+**Important:** The IDE shows false-positive "Unresolved reference" errors across the project. This is a known Kotlin plugin 2.1.x vs stdlib 2.3.10 version mismatch in IntelliJ IDEA. Trust Gradle output, not IDE squiggles. `./gradlew compileKotlin` always succeeds.
+
+---
+
+## 3. How to Run
+
+```bash
+# Mock mode (no API key needed)
+./gradlew run
+
+# OpenAI mode — Option A: environment variable
+export OPENAI_API_KEY=sk-...
+./gradlew run
+
+# OpenAI mode — Option B: .env file (gitignored, persists across restarts)
+echo 'OPENAI_API_KEY=sk-...' > .env
+./gradlew run
+
+# Run all tests
+./gradlew test
+
+# Build (compile only)
+./gradlew build
+
+# Package macOS DMG
+./gradlew packageDmg
+
+# Package Windows MSI (must run on Windows or Windows CI runner)
+./gradlew packageMsi
+```
+
+---
+
+## 4. Complete File Tree
+
+```
+StemAgentLab/
+│
+├── build.gradle.kts                   ← Kotlin DSL build file
+├── settings.gradle.kts                ← project name + plugin repos
+├── CLAUDE.md                          ← project instructions for Claude Code
+├── PROJECT.md                         ← this file
+├── README.md                          ← user-facing quick start
+├── writeup.md                         ← design decisions + results summary
+├── .env                               ← LOCAL ONLY, gitignored — OPENAI_API_KEY=sk-...
+├── .gitignore
+│
+├── .github/
+│   └── workflows/
+│       └── build.yml                  ← CI: test + packageDmg (macOS) + packageMsi (Windows)
+│
+├── src/
+│   ├── main/
+│   │   ├── kotlin/com/stemlab/
+│   │   │   │
+│   │   │   ├── Main.kt                ← entry point; system tray + Window
+│   │   │   │
+│   │   │   ├── app/
+│   │   │   │   ├── AppController.kt   ← orchestration: runEvolution, stopEvolution, resetAll, setDomain, exportReport
+│   │   │   │   ├── AppState.kt        ← AppState data class + Phase enum + Metrics
+│   │   │   │   └── DemoScenario.kt    ← loads bundled python_qa_tasks.json
+│   │   │   │
+│   │   │   ├── ui/
+│   │   │   │   ├── StemAgentLabApp.kt ← root Composable; header, status bar, action buttons, layout
+│   │   │   │   ├── components/
+│   │   │   │   │   ├── MetricsPanel.kt        ← baseline / best / improvement / tokens / cost
+│   │   │   │   │   ├── CandidateListPanel.kt  ← list of candidates with score bars and status badges
+│   │   │   │   │   ├── EvolutionLogPanel.kt   ← scrollable monospace log with colour coding
+│   │   │   │   │   ├── ToolRegistryPanel.kt   ← selected tools with token/cost estimates
+│   │   │   │   │   └── SettingsPanel.kt       ← domain TextField + Apply button
+│   │   │   │   └── theme/
+│   │   │   │       └── AppTheme.kt    ← dark colour scheme; all colour constants
+│   │   │   │
+│   │   │   ├── core/
+│   │   │   │   ├── model/
+│   │   │   │   │   ├── AgentConfig.kt         ← id, name, description, tools, skills, promptStrategy, maxTokens
+│   │   │   │   │   ├── CandidateAgent.kt      ← AgentConfig + score + cost + status + scoreCostRatio
+│   │   │   │   │   ├── ToolSpec.kt            ← id, name, description, estimatedTokensPerCall, estimatedCostPerCall
+│   │   │   │   │   ├── SkillSpec.kt           ← id, name, description
+│   │   │   │   │   ├── EvalTask.kt            ← id, description, code, expectedIssueKeywords
+│   │   │   │   │   ├── EvalResult.kt          ← taskId, agentId, agentResponse, matchedKeywords, score, tokensUsed, costEstimate
+│   │   │   │   │   ├── Budget.kt              ← maxTokens, maxCost, maxCandidates, maxRounds
+│   │   │   │   │   └── EvolutionResult.kt     ← runId, domain, candidates, selectedCandidateId, improvement, logs, timestamp
+│   │   │   │   │
+│   │   │   │   ├── agent/
+│   │   │   │   │   ├── BaselineAgent.kt       ← no tools, direct reasoning only
+│   │   │   │   │   ├── StemAgent.kt           ← proposeCandidates(); parses LLM JSON in OpenAI mode, uses defaultCandidatesFor() in mock mode
+│   │   │   │   │   ├── SpecializedAgent.kt    ← runs tool-augmented prompt for a given AgentConfig
+│   │   │   │   │   ├── CandidateAgentBuilder.kt ← builds (CandidateAgent, SpecializedAgent) pairs from configs
+│   │   │   │   │   └── CandidateConfigParser.kt ← parses {"candidates":[...]} JSON from LLM response; returns null on failure
+│   │   │   │   │
+│   │   │   │   ├── evolution/
+│   │   │   │   │   ├── EvolutionEngine.kt     ← main loop: baseline → propose → evaluate → select; uses onLog callback
+│   │   │   │   │   ├── VersionManager.kt      ← selectBest() by score²/cost ratio above baseline
+│   │   │   │   │   ├── StopCriteria.kt        ← shouldStop() checks rounds / candidates / tokens / cost
+│   │   │   │   │   ├── ToolSelector.kt        ← tier-based tool ID lists (utility, not called by engine directly)
+│   │   │   │   │   └── SkillSelector.kt       ← tier-based skill ID lists (utility, not called by engine directly)
+│   │   │   │   │
+│   │   │   │   ├── eval/
+│   │   │   │   │   ├── Evaluator.kt           ← interface: evaluate(agentId, tasks, runTask) → List<EvalResult>
+│   │   │   │   │   ├── PythonQaEvaluator.kt   ← implements Evaluator; calls ScoreCalculator per task
+│   │   │   │   │   └── ScoreCalculator.kt     ← score() = matched keywords / total keywords; aggregateScore() = mean
+│   │   │   │   │
+│   │   │   │   ├── registry/
+│   │   │   │   │   ├── ToolRegistry.kt        ← loads tools.json; resolve() returns GenericToolSpec for unknown IDs
+│   │   │   │   │   └── SkillRegistry.kt       ← loads skills.json; resolve() returns GenericSkillSpec for unknown IDs
+│   │   │   │   │
+│   │   │   │   └── tasks/
+│   │   │   │       ├── TaskGenerator.kt       ← interface: generate(domain, count) → List<EvalTask>
+│   │   │   │       ├── MockTaskGenerator.kt   ← python/qa/code domain → bundled tasks; other → generic tasks
+│   │   │   │       └── LlmTaskGenerator.kt    ← calls LLM for real tasks; fallback to MockTaskGenerator on parse failure
+│   │   │   │
+│   │   │   ├── llm/
+│   │   │   │   ├── LlmClient.kt              ← interface: isMock + complete(prompt) → LlmResponse
+│   │   │   │   ├── MockLlmClient.kt          ← deterministic responses; coverage factor driven by tool IDs in prompt
+│   │   │   │   ├── OpenAiLlmClient.kt        ← ktor POST to gpt-4o-mini; domain-agnostic system prompt
+│   │   │   │   └── PromptTemplates.kt        ← baseline(), toolAugmented(), candidateProposal(), generateTasks()
+│   │   │   │
+│   │   │   ├── tools/
+│   │   │   │   ├── PythonRunner.kt           ← subprocess Python execution (simulated in MVP)
+│   │   │   │   ├── FileReaderTool.kt         ← reads source files
+│   │   │   │   ├── TestGeneratorTool.kt      ← generates pytest stubs
+│   │   │   │   └── StaticAnalyzerTool.kt     ← static analysis simulation
+│   │   │   │
+│   │   │   ├── storage/
+│   │   │   │   ├── JsonStorage.kt            ← save/load<T> using kotlinx.serialization; @PublishedApi internal json
+│   │   │   │   └── RunHistoryStore.kt        ← saves EvolutionResult to runs/<runId>.json; loadAll() + latest()
+│   │   │   │
+│   │   │   ├── report/
+│   │   │   │   └── MarkdownReportExporter.kt ← export() writes to reports/report-<runId>.md; buildReport() is pure
+│   │   │   │
+│   │   │   └── util/
+│   │   │       └── DotEnvLoader.kt           ← reads OPENAI_API_KEY from env var, then .env file
+│   │   │
+│   │   └── resources/
+│   │       ├── datasets/
+│   │       │   └── python_qa_tasks.json       ← 5 Python bug-detection tasks with expectedIssueKeywords
+│   │       ├── registries/
+│   │       │   ├── tools.json                 ← 6 tool specs (code_reader, test_generator, python_runner, failure_analyzer, static_analyzer, patch_suggester)
+│   │       │   └── skills.json                ← skill specs (direct_reasoning, edge_case_reasoning, test_driven_analysis, ...)
+│   │       └── demo/
+│   │           └── mock_evolution_run.json    ← sample completed run for UI preview
+│   │
+│   └── test/
+│       └── kotlin/com/stemlab/
+│           ├── ScoreCalculatorTest.kt         ← 6 tests: perfect match, empty, partial, case-insensitive, aggregate, empty keywords
+│           ├── VersionManagerTest.kt          ← 4 tests: best ratio, rejects below baseline, SELECTED status, empty list
+│           ├── EvolutionEngineTest.kt         ← 6 tests: baseline scored, B selected, all scored, improvement positive, log milestones, ordering
+│           ├── StopCriteriaTest.kt            ← 8 tests: shouldStop on rounds/candidates/tokens/cost, isAcceptable
+│           ├── MarkdownReportExporterTest.kt  ← 11 tests: domain, baseline/best score, selected/rejected names, safeguards, file created, run id
+│           ├── TaskGeneratorTest.kt           ← 7 tests: python domain, count limit, generic domain, domain in description, keywords non-empty
+│           ├── CandidateConfigParserTest.kt   ← 7 tests: valid JSON, IDs, tools, invalid JSON, wrong count, prose surrounding, empty string
+│           └── ToolRegistryTest.kt            ← 7 tests: known tool, unknown → generic, mixed, cost > 0, readable name, empty, all 6 known tools
+│
+├── runs/                              ← auto-created; JSON run history (one file per run)
+└── reports/                           ← auto-created; Markdown reports (one file per run)
+```
+
+---
+
+## 5. Key Architectural Decisions
+
+### Score formula: score² / cost
+`CandidateAgent.scoreCostRatio = score * score / estimatedCost`
+
+The quadratic amplification means a 2× better score is 4× more attractive. This makes Candidate B win over Candidate A even though A is cheaper: B's score is ~58% better, so its ratio is ~2.5× higher.
+
+### Mock scoring via tool-ID coverage
+`MockLlmClient.coverageFor(toolIds)` returns a fixed factor based on which tools are present in the prompt:
+- No tools → 0.314 (baseline)
+- code_reader + static_analyzer → 0.543 (Candidate A)
+- code_reader + test_generator + python_runner + failure_analyzer → 0.857 (Candidate B)
+- ... + patch_suggester → 0.771 (Candidate C)
+
+This produces deterministic, reproducible before/after scores without an API key.
+
+### Single propose-evaluate cycle
+`EvolutionEngine` always passes `round = 0` to `StopCriteria.shouldStop()`. `maxRounds = 2` in `Budget` is therefore never violated in the current implementation. This is intentional — the engine runs exactly one cycle: propose → evaluate → select.
+
+### StateFlow + coroutines for UI reactivity
+`AppController` holds a single `MutableStateFlow<AppState>`. The UI calls `collectAsState()` and recomposes on every update. No business logic lives in Compose composables.
+
+### Mock → OpenAI switch
+`DotEnvLoader.loadApiKey()` checks `System.getenv("OPENAI_API_KEY")` first, then reads `.env` in the working directory. If found, `OpenAiLlmClient` is used. Otherwise `MockLlmClient`. The switch happens once at startup in `AppController.buildLlmClient()`.
+
+---
+
+## 6. Evolution Log — What You See in the UI
+
+The **Evolution Log** panel (bottom-right) shows all entries from `AppController.log()`. Each line is timestamped `[HH:MM]`. Colour coding in `EvolutionLogPanel`:
+- **Cyan** — lines containing "score" / "Score"
+- **Green** — lines containing "Selected" / "complete"
+- **Red** — lines containing "Rejected" / "ERROR"
+- **Grey** — all other lines
+
+Typical log sequence for a full run:
+
+```
+[12:00] Evolution started: baseline → propose → evaluate → select
+[12:00] Generating tasks for domain: "Python QA" via bundled dataset (mock mode)
+[12:00] Loaded 5 evaluation tasks
+[12:00] [abc12345] Evolution started — domain: Python QA
+[12:00] [abc12345] Loaded 5 evaluation tasks from dataset
+[12:00] [abc12345] Running Baseline Agent on 5 tasks...
+[12:00] [abc12345] Baseline score: 0.314 (avg keyword match)
+[12:00] [abc12345] StemAgent proposing candidate configurations...
+[12:00] [abc12345] Generated 3 candidates [default (mock mode)]: Candidate A, Candidate B, Candidate C
+[12:00] [abc12345] Evaluating Candidate A...
+[12:00] [abc12345] Candidate A score: 0.543 (Δ+0.229)
+[12:00] [abc12345] Evaluating Candidate B...
+[12:00] [abc12345] Candidate B score: 0.857 (Δ+0.543)
+[12:00] [abc12345] Evaluating Candidate C...
+[12:00] [abc12345] Candidate C score: 0.771 (Δ+0.457)
+[12:00] [abc12345] VersionManager selecting best candidate...
+[12:00] [abc12345] Selected: Candidate B (score=0.857, cost=$0.0094, ratio=78.12)
+[12:00] [abc12345] Rejected: Candidate A
+[12:00] [abc12345] Rejected: Candidate C
+[12:00] [abc12345] SpecializedAgent frozen with Candidate B configuration
+[12:00] [abc12345] Evolution complete — improvement: +172.3%
+```
+
+---
+
+## 7. Mock Mode — How It Works and How to Extend It
+
+### Architecture of the mock system
+
+```
+AppController.runEvolution()
+    └── MockTaskGenerator.generate(domain)       ← selects/generates tasks
+    └── EvolutionEngine.run(domain, tasks, onLog)
+            └── MockLlmClient.complete(prompt)   ← called per task per agent
+                    └── coverageFor(toolIds)     ← determines how many keywords are matched
+                    └── buildResponse(...)       ← returns a fake analysis text
+```
+
+### Adding a new domain to mock mode
+
+**Step 1** — Add a task-set branch in [MockTaskGenerator.kt](src/main/kotlin/com/stemlab/core/tasks/MockTaskGenerator.kt):
+
+```kotlin
+override suspend fun generate(domain: String, count: Int): List<EvalTask> {
+    val lower = domain.lowercase()
+    return when {
+        lower.contains("python") || lower.contains("qa") -> DemoScenario.loadTasks().take(count)
+        lower.contains("sql") -> sqlTasksFor(domain).take(count)   // ← add branch
+        else -> genericTasksFor(domain).take(count)
+    }
+}
+
+private fun sqlTasksFor(domain: String): List<EvalTask> = listOf(
+    EvalTask("sql_001", "Detect N+1 query in $domain", "SELECT * FROM ...", listOf("N+1", "eager loading", "JOIN")),
+    // ...
+)
+```
+
+**Step 2** — Add a coverage pattern in [MockLlmClient.kt](src/main/kotlin/com/stemlab/llm/MockLlmClient.kt) `coverageFor()` if you add domain-specific tools:
+
+```kotlin
+private fun coverageFor(toolIds: List<String>): Double = when {
+    toolIds.containsAll(listOf("sql_analyzer", "query_optimizer")) -> 0.82   // ← new pattern
+    toolIds.containsAll(listOf("code_reader", "test_generator", ...)) -> 0.857
+    // ...
+}
+```
+
+**Step 3** — Add task-specific keywords to the `taskKeywords` map in `MockLlmClient` so the mock responses contain relevant content:
+
+```kotlin
+private val taskKeywords = mapOf(
+    "sql_001" to listOf("N+1", "eager loading", "JOIN", "SELECT N"),
+    // ...
+)
+```
+
+### Adding a new mock candidate configuration
+
+In [StemAgent.kt](src/main/kotlin/com/stemlab/core/agent/StemAgent.kt) `defaultCandidatesFor()`, add a domain-specific branch or modify the existing configs:
+
+```kotlin
+private fun defaultCandidatesFor(domain: String): List<AgentConfig> {
+    val lower = domain.lowercase()
+    return if (lower.contains("sql")) sqlCandidates() else defaultPythonCandidates()
+}
+```
+
+---
+
+## 8. Testing Guide
+
+### Run all tests
+
+```bash
+./gradlew test
+```
+
+### Test suite (56 tests total across 8 files)
+
+| File | Tests | What it covers |
+|------|-------|----------------|
+| `ScoreCalculatorTest` | 6 | Keyword matching, scoring formula, edge cases |
+| `VersionManagerTest` | 4 | Candidate selection, ratio logic, SELECTED status |
+| `EvolutionEngineTest` | 6 | Full mock run, B selected, log milestones, score ordering |
+| `StopCriteriaTest` | 8 | shouldStop on all 4 axes, isAcceptable |
+| `MarkdownReportExporterTest` | 11 | Report content, file creation, graceful no-candidate case |
+| `TaskGeneratorTest` | 7 | Python domain, generic domain, count limit, keyword presence |
+| `CandidateConfigParserTest` | 7 | Valid JSON, malformed JSON, wrong count, prose-wrapped JSON |
+| `ToolRegistryTest` | 7 | Known tools, unknown → generic fallback, empty list |
+
+### Watching test output
+
+```bash
+./gradlew test --info 2>&1 | grep -E "PASSED|FAILED|tests="
+```
+
+### What is NOT tested (known gaps)
+
+- OpenAiLlmClient (requires live network + API key)
+- Compose UI components (no headless UI test harness configured)
+- RunHistoryStore file I/O (low risk, tested implicitly via EvolutionEngine)
+- DotEnvLoader (trivial, no secret to test with)
+
+---
+
+## 9. What Still Needs Work
+
+| Area | Gap | Effort |
+|------|-----|--------|
+| Multi-round evolution | Engine always runs round=0; maxRounds=2 is never used | Medium |
+| LLM-as-judge scoring | Keyword matching only; no semantic correctness | High |
+| Persistent frozen agent | Winning config not saved/reloaded across app restarts | Medium |
+| Per-task response diff | No UI to compare what each candidate said per task | Medium |
+| OpenAI task generation | LlmTaskGenerator calls LLM but EvalTask JSON must match exactly | Low |
+| ToolSelector / SkillSelector | These classes exist but are not called by EvolutionEngine | Low (cleanup only) |
+| UI tests | No automated headless Compose tests | High |
+| `packageMsi` on macOS | Must be run on Windows or Windows CI runner | N/A |
+
+---
+
+## 10. Data Formats
+
+### EvalTask (src/main/resources/datasets/python_qa_tasks.json)
+
+```json
+{
+  "id": "task_001",
+  "description": "Detect division by zero in divide function",
+  "code": "def divide(a, b):\n    return a / b",
+  "expectedIssueKeywords": ["ZeroDivisionError", "check b != 0", "guard clause"]
+}
+```
+
+### AgentConfig (returned by StemAgent, stored in EvolutionResult)
+
+```json
+{
+  "id": "candidate_b",
+  "name": "Candidate B",
+  "description": "Full evaluation pipeline for Python QA",
+  "tools": ["code_reader", "test_generator", "python_runner", "failure_analyzer"],
+  "skills": ["direct_reasoning", "edge_case_reasoning", "test_driven_analysis", "root_cause_analysis"],
+  "promptStrategy": "tool_augmented",
+  "maxTokens": 1200
+}
+```
+
+### LLM candidate proposal format (OpenAI mode, parsed by CandidateConfigParser)
+
+```json
+{
+  "candidates": [
+    { "id": "candidate_a", "name": "Candidate A", "tools": [...], "skills": [...], "promptStrategy": "tool_augmented", "maxTokens": 800 },
+    { "id": "candidate_b", "name": "Candidate B", "tools": [...], "skills": [...], "promptStrategy": "tool_augmented", "maxTokens": 1200 },
+    { "id": "candidate_c", "name": "Candidate C", "tools": [...], "skills": [...], "promptStrategy": "tool_augmented", "maxTokens": 1500 }
+  ]
+}
+```
+
+---
+
+## 11. Known IDE Issue
+
+IntelliJ IDEA shows "Unresolved reference" errors for virtually everything in the project. This is because the IDE's bundled Kotlin plugin (2.1.x) is out of sync with the project's Kotlin stdlib (2.3.10). **These errors are false positives.** The project compiles and runs correctly via Gradle:
+
+```bash
+./gradlew compileKotlin   # always succeeds
+./gradlew test            # all tests pass
+./gradlew run             # app launches
+```
+
+Do not attempt to "fix" these IDE errors by downgrading dependencies.

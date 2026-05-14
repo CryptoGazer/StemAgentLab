@@ -1,0 +1,44 @@
+[
+  {
+    "id": "code_reader",
+    "name": "Code Reader",
+    "description": "Reads and parses Python source code, extracting structure, variable names, and control flow.",
+    "estimatedTokensPerCall": 220,
+    "estimatedCostPerCall": 0.00044
+  },
+  {
+    "id": "test_generator",
+    "name": "Test Generator",
+    "description": "Generates pytest test cases for the given Python function, covering happy path and edge cases.",
+    "estimatedTokensPerCall": 300,
+    "estimatedCostPerCall": 0.0006
+  },
+  {
+    "id": "python_runner",
+    "name": "Python Runner",
+    "description": "Executes Python code snippets in a sandboxed environment and captures stdout, stderr, and exit codes.",
+    "estimatedTokensPerCall": 180,
+    "estimatedCostPerCall": 0.00036
+  },
+  {
+    "id": "failure_analyzer",
+    "name": "Failure Analyzer",
+    "description": "Analyzes test failures, stack traces, and error messages to identify root causes.",
+    "estimatedTokensPerCall": 250,
+    "estimatedCostPerCall": 0.0005
+  },
+  {
+    "id": "static_analyzer",
+    "name": "Static Analyzer",
+    "description": "Performs static analysis on Python code checking for type hints, style issues, and common anti-patterns.",
+    "estimatedTokensPerCall": 200,
+    "estimatedCostPerCall": 0.0004
+  },
+  {
+    "id": "patch_suggester",
+    "name": "Patch Suggester",
+    "description": "Generates corrected code patches for identified bugs and suggests refactoring improvements.",
+    "estimatedTokensPerCall": 280,
+    "estimatedCostPerCall": 0.00056
+  }
+]
