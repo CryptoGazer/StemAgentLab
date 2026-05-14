@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
@@ -34,262 +35,423 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
     val state by controller.state.collectAsState()
     val activeProject = state.activeProject
 
-    // Reset confirmation dialog state
     var showResetDialog by remember { mutableStateOf(false) }
     var resetInput by remember { mutableStateOf("") }
     var showNewProjectDialog by remember { mutableStateOf(false) }
-    // Capture the specific project at click time so the dialog condition is a simple null check
     var projectToDelete by remember { mutableStateOf<com.stemlab.app.ProjectViewState?>(null) }
     var rightPaneHeightPx by remember { mutableStateOf(1) }
     var candidatePaneFraction by remember { mutableStateOf(0.42f) }
-
-    if (showResetDialog) {
-        ResetConfirmDialog(
-            input = resetInput,
-            onInputChange = { resetInput = it.uppercase() },
-            onConfirm = {
-                controller.resetAll()
-                showResetDialog = false
-                resetInput = ""
-            },
-            onDismiss = {
-                showResetDialog = false
-                resetInput = ""
-            }
-        )
-    }
-
-    if (showNewProjectDialog) {
-        NewProjectDialog(
-            onCreate = { name, domain, description ->
-                controller.createProject(name, domain, description)
-                showNewProjectDialog = false
-            },
-            onDismiss = { showNewProjectDialog = false }
-        )
-    }
-
-    val deletingProject = projectToDelete
-    if (deletingProject != null) {
-        DeleteProjectDialog(
-            projectName = deletingProject.name,
-            onConfirm = {
-                controller.deleteProject(deletingProject.id)
-                projectToDelete = null
-            },
-            onDismiss = { projectToDelete = null }
-        )
-    }
 
     AppTheme {
         Surface(modifier = Modifier.fillMaxSize(), color = SurfaceDark) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val outerScrollState = rememberScrollState()
                 val mainContentHeight = (maxHeight - 156.dp).coerceAtLeast(720.dp)
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = maxHeight)
-                    .verticalScroll(outerScrollState)
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // ─── Header ───────────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text("Stem Agent Lab", color = OnSurface, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                        Text("Controlled agent specialisation loop", color = OnSurfaceDim, fontSize = 12.sp)
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        ProjectSelector(
-                            projects = state.projects,
-                            activeProjectId = state.activeProjectId,
-                            onSelect = controller::selectProject,
-                            onNewProject = { showNewProjectDialog = true }
-                        )
-                    }
-                }
-
-                // ─── Status bar ───────────────────────────────────────────
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(CardBackground)
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                        .heightIn(min = maxHeight)
+                        .verticalScroll(outerScrollState)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(activeProject?.statusMessage ?: "Create a project to begin.", color = OnSurfaceDim, fontSize = 12.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(state.llmLabel, color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        when {
-                            activeProject?.isRunning == true -> Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(14.dp),
-                                    strokeWidth = 2.dp,
-                                    color = AccentCyan
-                                )
-                                Text(
-                                    activeProject.currentPhase.name.replace("_", " "),
-                                    color = AccentCyan,
-                                    fontSize = 11.sp
-                                )
-                            }
-                            activeProject?.currentPhase == Phase.DONE ->
-                                Text("DONE", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            activeProject?.currentPhase == Phase.IDLE && activeProject.candidates.isNotEmpty() ->
-                                Text("STOPPED", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                            else -> {}
-                        }
-                    }
-                }
-
-                // ─── Action buttons ───────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (activeProject?.isRunning == true) {
-                        // While running: show only Stop prominently
-                        Button(
-                            onClick = controller::stopEvolution,
-                            modifier = Modifier.weight(1f).height(40.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Text("■  Stop Evolution", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                        }
-                        // Grayed-out placeholders so layout doesn't jump
-                        repeat(4) {
-                            OutlinedButton(
-                                onClick = {},
-                                enabled = false,
-                                modifier = Modifier.weight(1f).height(40.dp),
-                                shape = RoundedCornerShape(8.dp)
-                            ) { Text("—", fontSize = 13.sp) }
-                        }
-                    } else {
-                        ActionButton(
-                            label = "▶  Run Evolution",
-                            enabled = activeProject != null,
-                            primary = true,
-                            onClick = controller::runEvolution,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            label = "✓  Final Evaluation",
-                            enabled = activeProject?.lastResult != null,
-                            primary = false,
-                            onClick = controller::runFinalEvaluation,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            label = "⟳  Eval Frozen",
-                            enabled = activeProject?.frozenAgent != null,
-                            primary = false,
-                            onClick = controller::evaluateFrozenAgent,
-                            modifier = Modifier.weight(1f)
-                        )
-                        ActionButton(
-                            label = "↓  Export Report",
-                            enabled = activeProject?.lastResult != null,
-                            primary = false,
-                            onClick = controller::exportReport,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // Destructive reset — separate, visually distinct
-                        OutlinedButton(
-                            onClick = { showResetDialog = true },
-                            modifier = Modifier.weight(1f).height(40.dp),
-                            border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.6f)),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed)
-                        ) {
-                            Text("✕  Reset All", fontSize = 13.sp)
-                        }
-                    }
-                }
-
-                // ─── Main content ──────────────────────────────────────────
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(mainContentHeight),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Left column: settings + metrics + tools
-                    Column(
-                        modifier = Modifier.width(300.dp).fillMaxHeight(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    // ─── Header ───────────────────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        ProjectMenuPanel(
-                            projects = state.projects,
-                            activeProjectId = state.activeProjectId,
-                            onSelect = controller::selectProject,
-                            onNewProject = { showNewProjectDialog = true },
-                            onDeleteProject = { projectToDelete = activeProject },
-                            modifier = Modifier.height(220.dp)
-                        )
-                        if (activeProject != null) {
-                            SettingsPanel(
-                                projectName = activeProject.name,
-                                domain = activeProject.domain,
-                                description = activeProject.spec.description,
-                                isRunning = activeProject.isRunning,
-                                onApply = controller::updateActiveProject
+                        Column {
+                            Text("Stem Agent Lab", color = OnSurface, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            Text("Controlled agent specialisation loop", color = OnSurfaceDim, fontSize = 12.sp)
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            ProjectSelector(
+                                projects = state.projects,
+                                activeProjectId = state.activeProjectId,
+                                onSelect = controller::selectProject,
+                                onNewProject = { showNewProjectDialog = true }
                             )
-                            MetricsPanel(metrics = activeProject.metrics)
-                            ToolRegistryPanel(tools = activeProject.selectedTools, modifier = Modifier.weight(0.66f))
                         }
                     }
 
-                    // Right column: candidates + log
-                    Column(
+                    // ─── Status bar ───────────────────────────────────────────
+                    Row(
                         modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .onSizeChanged { rightPaneHeightPx = it.height.coerceAtLeast(1) },
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(CardBackground)
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        CandidateListPanel(
-                            candidates = activeProject?.let { project ->
-                                project.candidates.filterNot { it.id in project.dismissedCandidateIds }
-                            }.orEmpty(),
-                            onDismissRejected = controller::dismissRejectedCandidate,
-                            modifier = Modifier.weight(candidatePaneFraction)
-                        )
-                        VerticalResizeHandle(
-                            onDrag = { deltaY ->
-                                val deltaFraction = deltaY / rightPaneHeightPx.toFloat()
-                                candidatePaneFraction = (candidatePaneFraction + deltaFraction).coerceIn(0.22f, 0.72f)
+                        Text(activeProject?.statusMessage ?: "Create a project to begin.", color = OnSurfaceDim, fontSize = 12.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(state.llmLabel, color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            when {
+                                activeProject?.isRunning == true -> Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(14.dp),
+                                        strokeWidth = 2.dp,
+                                        color = AccentCyan
+                                    )
+                                    Text(
+                                        activeProject.currentPhase.name.replace("_", " "),
+                                        color = AccentCyan,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                                activeProject?.currentPhase == Phase.DONE ->
+                                    Text("DONE", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                activeProject?.currentPhase == Phase.IDLE && activeProject.candidates.isNotEmpty() ->
+                                    Text("STOPPED", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                else -> {}
                             }
-                        )
-                        FrozenAgentPanel(
-                            frozenAgent = activeProject?.frozenAgent,
-                            modifier = Modifier.height(190.dp)
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        EvolutionLogPanel(
-                            logs = activeProject?.logs.orEmpty(),
-                            modifier = Modifier.weight(1f - candidatePaneFraction)
-                        )
+                        }
+                    }
+
+                    // ─── Action buttons ───────────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        if (activeProject?.isRunning == true) {
+                            Button(
+                                onClick = controller::stopEvolution,
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Text("■  Stop Evolution", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                            repeat(4) {
+                                OutlinedButton(
+                                    onClick = {},
+                                    enabled = false,
+                                    modifier = Modifier.weight(1f).height(40.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) { Text("—", fontSize = 13.sp) }
+                            }
+                        } else {
+                            ActionButton(
+                                label = "▶  Run Evolution",
+                                enabled = activeProject != null,
+                                primary = true,
+                                onClick = controller::runEvolution,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ActionButton(
+                                label = "✓  Final Evaluation",
+                                enabled = activeProject?.lastResult != null,
+                                primary = false,
+                                onClick = controller::runFinalEvaluation,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ActionButton(
+                                label = "⟳  Eval Frozen",
+                                enabled = activeProject?.frozenAgent != null,
+                                primary = false,
+                                onClick = controller::evaluateFrozenAgent,
+                                modifier = Modifier.weight(1f)
+                            )
+                            ActionButton(
+                                label = "↓  Export Report",
+                                enabled = activeProject?.lastResult != null,
+                                primary = false,
+                                onClick = controller::exportReport,
+                                modifier = Modifier.weight(1f)
+                            )
+                            OutlinedButton(
+                                onClick = { showResetDialog = true },
+                                modifier = Modifier.weight(1f).height(40.dp),
+                                border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.6f)),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = ErrorRed)
+                            ) {
+                                Text("✕  Reset All", fontSize = 13.sp)
+                            }
+                        }
+                    }
+
+                    // ─── Main content ──────────────────────────────────────────
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(mainContentHeight),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        // Left column
+                        Column(
+                            modifier = Modifier.width(300.dp).fillMaxHeight(),
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            ProjectMenuPanel(
+                                projects = state.projects,
+                                activeProjectId = state.activeProjectId,
+                                onSelect = controller::selectProject,
+                                onNewProject = { showNewProjectDialog = true },
+                                onDeleteProject = { projectToDelete = activeProject },
+                                modifier = Modifier.height(220.dp)
+                            )
+                            if (activeProject != null) {
+                                SettingsPanel(
+                                    projectName = activeProject.name,
+                                    domain = activeProject.domain,
+                                    description = activeProject.spec.description,
+                                    isRunning = activeProject.isRunning,
+                                    onApply = controller::updateActiveProject
+                                )
+                                MetricsPanel(metrics = activeProject.metrics)
+                                ToolRegistryPanel(tools = activeProject.selectedTools, modifier = Modifier.weight(0.66f))
+                            }
+                        }
+
+                        // Right column
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .onSizeChanged { rightPaneHeightPx = it.height.coerceAtLeast(1) },
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            CandidateListPanel(
+                                candidates = activeProject?.let { project ->
+                                    project.candidates.filterNot { it.id in project.dismissedCandidateIds }
+                                }.orEmpty(),
+                                onDismissRejected = controller::dismissRejectedCandidate,
+                                modifier = Modifier.weight(candidatePaneFraction)
+                            )
+                            VerticalResizeHandle(
+                                onDrag = { deltaY ->
+                                    val deltaFraction = deltaY / rightPaneHeightPx.toFloat()
+                                    candidatePaneFraction = (candidatePaneFraction + deltaFraction).coerceIn(0.22f, 0.72f)
+                                }
+                            )
+                            FrozenAgentPanel(
+                                frozenAgent = activeProject?.frozenAgent,
+                                modifier = Modifier.height(190.dp)
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            EvolutionLogPanel(
+                                logs = activeProject?.logs.orEmpty(),
+                                modifier = Modifier.weight(1f - candidatePaneFraction)
+                            )
+                        }
                     }
                 }
-            }
+
                 VerticalScrollbar(
                     adapter = rememberScrollbarAdapter(outerScrollState),
                     modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight()
                 )
+
+                // ─── In-app dialog overlays (always on top, no OS-level JDialog) ───
+                if (showResetDialog) {
+                    ResetConfirmOverlay(
+                        input = resetInput,
+                        onInputChange = { resetInput = it.uppercase() },
+                        onConfirm = {
+                            controller.resetAll()
+                            showResetDialog = false
+                            resetInput = ""
+                        },
+                        onDismiss = {
+                            showResetDialog = false
+                            resetInput = ""
+                        }
+                    )
+                }
+
+                if (showNewProjectDialog) {
+                    NewProjectOverlay(
+                        onCreate = { name, domain, description ->
+                            controller.createProject(name, domain, description)
+                            showNewProjectDialog = false
+                        },
+                        onDismiss = { showNewProjectDialog = false }
+                    )
+                }
+
+                val deletingProject = projectToDelete
+                if (deletingProject != null) {
+                    DeleteProjectOverlay(
+                        projectName = deletingProject.name,
+                        onConfirm = {
+                            controller.deleteProject(deletingProject.id)
+                            projectToDelete = null
+                        },
+                        onDismiss = { projectToDelete = null }
+                    )
+                }
             }
         }
     }
 }
+
+// ─── In-app overlay dialogs ─────────────────────────────────────────────────
+
+@Composable
+private fun OverlayScrim(onDismiss: () -> Unit, content: @Composable BoxScope.() -> Unit) {
+    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        // Semi-transparent scrim — clicks on it dismiss
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .clickable(onClick = onDismiss)
+        )
+        // Dialog card — sits on top, absorbs its own clicks so they don't reach the scrim
+        content()
+    }
+}
+
+@Composable
+private fun DeleteProjectOverlay(
+    projectName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    OverlayScrim(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 380.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(CardBackground)
+                .clickable {}   // absorb clicks so they don't reach the scrim
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Text("Delete Project?", color = ErrorRed, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                "Delete \"$projectName\" and its local runs/reports?",
+                color = OnSurface, fontSize = 13.sp
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    border = BorderStroke(1.dp, SurfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Cancel", color = OnSurfaceDim) }
+                Button(
+                    onClick = onConfirm,
+                    colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Delete", fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ResetConfirmOverlay(
+    input: String,
+    onInputChange: (String) -> Unit,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    OverlayScrim(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 400.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(CardBackground)
+                .clickable {}
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("Reset All Progress?", color = ErrorRed, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                "This will delete all run history, cached results, and exported reports. " +
+                "This cannot be undone.",
+                color = OnSurface, fontSize = 13.sp
+            )
+            Text("Type RESET to confirm:", color = OnSurfaceDim, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            OutlinedTextField(
+                value = input,
+                onValueChange = onInputChange,
+                singleLine = true,
+                placeholder = { Text("RESET", color = OnSurfaceDim) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = ErrorRed,
+                    unfocusedBorderColor = SurfaceVariant,
+                    focusedTextColor = OnSurface,
+                    unfocusedTextColor = OnSurface,
+                    cursorColor = ErrorRed
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    border = BorderStroke(1.dp, SurfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Cancel", color = OnSurfaceDim) }
+                Button(
+                    onClick = onConfirm,
+                    enabled = input.trim() == "RESET",
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = ErrorRed,
+                        disabledContainerColor = SurfaceVariant
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Delete Everything", fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NewProjectOverlay(
+    onCreate: (name: String, domain: String, description: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var domain by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val canCreate = domain.trim().isNotBlank()
+
+    OverlayScrim(onDismiss = onDismiss) {
+        Column(
+            modifier = Modifier
+                .widthIn(max = 380.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(CardBackground)
+                .clickable {}
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("New Project", color = OnSurface, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            DialogField(value = name, onValueChange = { name = it }, label = "Name", placeholder = "e.g. SQL Review")
+            DialogField(value = domain, onValueChange = { domain = it }, label = "Domain", placeholder = "e.g. SQL Optimizer")
+            DialogField(value = description, onValueChange = { description = it }, label = "Description", placeholder = "Optional project notes")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+            ) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    border = BorderStroke(1.dp, SurfaceVariant),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Cancel", color = OnSurfaceDim) }
+                Button(
+                    onClick = { onCreate(name, domain, description) },
+                    enabled = canCreate,
+                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Create", color = Color.Black, fontWeight = FontWeight.Bold) }
+            }
+        }
+    }
+}
+
+// ─── Reusable components ─────────────────────────────────────────────────────
 
 @Composable
 private fun VerticalResizeHandle(onDrag: (Float) -> Unit) {
@@ -367,102 +529,6 @@ private fun ProjectSelector(
 }
 
 @Composable
-private fun DeleteProjectDialog(
-    projectName: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardBackground,
-        title = { Text("Delete Project?", color = ErrorRed, fontWeight = FontWeight.Bold) },
-        text = {
-            Text(
-                "Delete \"$projectName\" and its local runs/reports?",
-                color = OnSurface,
-                fontSize = 13.sp
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Delete", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                border = BorderStroke(1.dp, SurfaceVariant),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Cancel", color = OnSurfaceDim)
-            }
-        }
-    )
-}
-
-@Composable
-private fun NewProjectDialog(
-    onCreate: (name: String, domain: String, description: String) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var domain by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    val canCreate = domain.trim().isNotBlank()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardBackground,
-        title = { Text("New Project", color = OnSurface, fontWeight = FontWeight.Bold) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                DialogField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = "Name",
-                    placeholder = "e.g. SQL Review"
-                )
-                DialogField(
-                    value = domain,
-                    onValueChange = { domain = it },
-                    label = "Domain",
-                    placeholder = "e.g. SQL Optimizer"
-                )
-                DialogField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = "Description",
-                    placeholder = "Optional project notes"
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onCreate(name, domain, description) },
-                enabled = canCreate,
-                colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Create", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                border = BorderStroke(1.dp, SurfaceVariant),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Cancel", color = OnSurfaceDim)
-            }
-        }
-    )
-}
-
-@Composable
 private fun DialogField(
     value: String,
     onValueChange: (String) -> Unit,
@@ -501,7 +567,7 @@ private fun ProjectMenuPanel(
             modifier = Modifier.fillMaxWidth().height(34.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = PrimaryGreen,
-                contentColor = androidx.compose.ui.graphics.Color.Black
+                contentColor = Color.Black
             ),
             shape = RoundedCornerShape(6.dp),
             contentPadding = PaddingValues(0.dp)
@@ -583,86 +649,6 @@ private fun ProjectRow(
 }
 
 @Composable
-private fun ResetConfirmDialog(
-    input: String,
-    onInputChange: (String) -> Unit,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = CardBackground,
-        title = {
-            Text("Reset All Progress?", color = ErrorRed, fontWeight = FontWeight.Bold)
-        },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    "This will delete all run history, cached results, and exported reports. " +
-                    "This cannot be undone.",
-                    color = OnSurface,
-                    fontSize = 13.sp
-                )
-                Text(
-                    "Type RESET to confirm:",
-                    color = OnSurfaceDim,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
-                )
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = onInputChange,
-                    singleLine = true,
-                    placeholder = { Text("RESET", color = OnSurfaceDim) },
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = ErrorRed,
-                        unfocusedBorderColor = SurfaceVariant,
-                        focusedTextColor = OnSurface,
-                        unfocusedTextColor = OnSurface,
-                        cursorColor = ErrorRed
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                enabled = input.trim() == "RESET",
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = ErrorRed,
-                    disabledContainerColor = SurfaceVariant
-                ),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Delete Everything", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                border = BorderStroke(1.dp, SurfaceVariant),
-                shape = RoundedCornerShape(8.dp)
-            ) {
-                Text("Cancel", color = OnSurfaceDim)
-            }
-        }
-    )
-}
-
-@Composable
-private fun ProjectBadge(name: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(PrimaryGreenVariant.copy(alpha = 0.3f))
-            .padding(horizontal = 12.dp, vertical = 5.dp)
-    ) {
-        Text(name, color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
 private fun ActionButton(
     label: String,
     enabled: Boolean,
@@ -677,7 +663,7 @@ private fun ActionButton(
             modifier = modifier.height(40.dp),
             colors = ButtonDefaults.buttonColors(
                 containerColor = PrimaryGreen,
-                contentColor = androidx.compose.ui.graphics.Color.Black,
+                contentColor = Color.Black,
                 disabledContainerColor = SurfaceVariant,
                 disabledContentColor = OnSurfaceDim
             ),
