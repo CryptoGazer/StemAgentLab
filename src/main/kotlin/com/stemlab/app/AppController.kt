@@ -138,7 +138,8 @@ class AppController(
         projectJobs[projectId] = scope.launch {
             try {
                 appendLog(projectId, "Generating tasks for domain: \"${project.domain}\" via OpenAI")
-                val tasks = taskGenerator.generate(project.domain)
+                val generated = taskGenerator.generateWithUsage(project.domain)
+                val tasks = generated.tasks
                 appendLog(projectId, "Loaded ${tasks.size} evaluation tasks")
 
                 val engine = EvolutionEngine(llmClient, toolRegistry, Budget())
@@ -152,7 +153,11 @@ class AppController(
                     }
                 }
 
-                val resultWithLogs = result.copy(logs = currentLogs(projectId))
+                val resultWithGenerationUsage = result.copy(
+                    totalTokensUsed = result.totalTokensUsed + generated.tokensUsed,
+                    totalCost = result.totalCost + generated.costEstimate
+                )
+                val resultWithLogs = resultWithGenerationUsage.copy(logs = currentLogs(projectId))
                 projectStore.saveRun(projectId, resultWithLogs)
 
                 val updatedSpec = project.spec.copy(

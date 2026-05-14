@@ -95,6 +95,10 @@ class AppControllerProjectTest {
             assertTrue(projects.all { it.lastResult != null })
             assertNotNull(projects.first { it.id == "python-qa" }.lastResult)
             assertNotNull(projects.first { it.id == sqlId }.lastResult)
+            projects.forEach { project ->
+                assertEquals(100, project.lastResult?.totalTokensUsed)
+                assertEquals(0.01, project.lastResult?.totalCost ?: 0.0, absoluteTolerance = 0.0001)
+            }
         } finally {
             controller.close()
             dir.deleteRecursively()

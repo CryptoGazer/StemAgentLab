@@ -2,27 +2,27 @@ package com.stemlab.core.eval
 
 import com.stemlab.core.model.EvalResult
 import com.stemlab.core.model.EvalTask
+import com.stemlab.llm.LlmResponse
 
 class PythonQaEvaluator : Evaluator {
 
     override suspend fun evaluate(
         agentId: String,
         tasks: List<EvalTask>,
-        runTask: suspend (EvalTask) -> Pair<String, Int>
+        runTask: suspend (EvalTask) -> LlmResponse
     ): List<EvalResult> = tasks.map { task ->
-        val (response, tokensUsed) = runTask(task)
-        val score = ScoreCalculator.score(task, response)
-        val matched = ScoreCalculator.matchedKeywords(task, response)
-        val cost = tokensUsed * 0.000002
+        val response = runTask(task)
+        val score = ScoreCalculator.score(task, response.text)
+        val matched = ScoreCalculator.matchedKeywords(task, response.text)
 
         EvalResult(
             taskId = task.id,
             agentId = agentId,
-            agentResponse = response,
+            agentResponse = response.text,
             matchedKeywords = matched,
             score = score,
-            tokensUsed = tokensUsed,
-            costEstimate = cost
+            tokensUsed = response.tokensUsed,
+            costEstimate = response.costEstimate
         )
     }
 }

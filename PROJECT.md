@@ -218,6 +218,12 @@ All agent responses now come from `OpenAiLlmClient`. Scoring is still determinis
 ### Project sessions
 `AppController` manages a list of `ProjectViewState` objects and a `projectJobs` map keyed by `projectId`. Each project has its own phase, logs, metrics, selected tools, latest result, export path, and optional running job. One project cannot be started twice, but different projects can run concurrently.
 
+### Parallel candidate evaluation
+Within a single project run, `EvolutionEngine` evaluates candidate agents concurrently after baseline and candidate proposal complete. `Budget.maxParallelCandidates` limits in-run OpenAI pressure (default: 2), so extra candidates wait for a permit instead of launching unlimited requests. Candidate task execution remains sequential inside each candidate to keep logs, budget accounting, and rate-limit behavior predictable.
+
+### Token and cost accounting
+`PythonQaEvaluator` now preserves `LlmResponse.tokensUsed` and `LlmResponse.costEstimate` instead of recalculating cost from a fixed token multiplier. Run totals include task generation, baseline evaluation, candidate proposal, and all candidate evaluations.
+
 ### StateFlow + coroutines for UI reactivity
 `AppController` holds a single `MutableStateFlow<AppState>`. The UI calls `collectAsState()` and recomposes on every update. No business logic lives in Compose composables.
 
