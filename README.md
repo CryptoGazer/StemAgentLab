@@ -53,14 +53,16 @@ Packages are output to `build/compose/binaries/main/`.
 
 ---
 
-## Evolution Loop
+## Projects and Evolution Loop
 
 ```
-Domain input (Python QA)
+Create or select a project
+        ↓
+Project domain input (Python QA, SQL Optimizer, ...)
         ↓
 StemAgent proposes 3 candidate configurations (A / B / C)
         ↓
-Evaluator tests each on 5 Python bug-detection tasks
+Evaluator tests each on OpenAI-generated benchmark tasks
         ↓
 VersionManager selects the candidate with best score / cost ratio
         ↓
@@ -68,19 +70,16 @@ SpecializedAgent is frozen with the winning configuration
         ↓
 UI shows: logs · metrics · selected tools · before/after comparison
         ↓
-Export → reports/report-<runId>.md
+Export → projects/<projectId>/reports/report-<runId>.md
 ```
+
+The left sidebar contains the current project list and a `New Project` button. Each project has its own domain, logs, latest result, selected tools, report path, and running job. You can start one project, switch to another, and start a second run while the first is still running.
 
 ---
 
 ## Candidate Strategies
 
-| Agent | Tools | Expected score (mock) |
-|-------|-------|-----------------------|
-| Baseline | (none) | ~0.31 |
-| Candidate A | code\_reader, static\_analyzer | ~0.54 |
-| **Candidate B** ✓ | code\_reader, test\_generator, python\_runner, failure\_analyzer | **~0.86** |
-| Candidate C | all above + patch\_suggester | ~0.77 (higher cost → lower ratio) |
+Candidate configurations are proposed by OpenAI for the active project domain. The default prompt still asks for three capability levels: lightweight analysis, fuller test/execution workflow, and maximal tooling with patch suggestion.
 
 ---
 
@@ -102,7 +101,7 @@ src/main/kotlin/com/stemlab/
 │   └── registry/              ← ToolRegistry, SkillRegistry
 ├── llm/                       ← LlmClient, OpenAiLlmClient
 ├── tools/                     ← PythonRunner, FileReaderTool, ...
-├── storage/                   ← JsonStorage, RunHistoryStore
+├── storage/                   ← JsonStorage, ProjectStore, RunHistoryStore
 └── report/                    ← MarkdownReportExporter
 
 src/main/resources/
@@ -110,8 +109,7 @@ src/main/resources/
 ├── registries/tools.json + skills.json
 └── demo/mock_evolution_run.json
 
-runs/        ← JSON run history (auto-created)
-reports/     ← Exported markdown reports (auto-created)
+projects/    ← local project index, per-project runs, exported reports (auto-created, gitignored)
 ```
 
 ---

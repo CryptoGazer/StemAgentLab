@@ -7,7 +7,7 @@ import java.time.Instant
 
 object MarkdownReportExporter {
 
-    fun export(result: EvolutionResult, outputPath: String = "reports/report-${result.runId}.md"): String {
+    fun export(result: EvolutionResult, outputPath: String = "projects/default/reports/report-${result.runId}.md"): String {
         val md = buildReport(result)
         File(outputPath).apply {
             parentFile?.mkdirs()

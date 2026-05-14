@@ -49,3 +49,6 @@ CLAUDE.md
 ### Local secrets — NEVER commit ###
 .env
 .env.local
+
+### Local app data ###
+projects/

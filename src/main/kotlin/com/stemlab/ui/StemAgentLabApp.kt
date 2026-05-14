@@ -2,7 +2,11 @@ package com.stemlab.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -20,10 +24,13 @@ import com.stemlab.ui.theme.*
 @Composable
 fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
     val state by controller.state.collectAsState()
+    val activeProject = state.activeProject
 
     // Reset confirmation dialog state
     var showResetDialog by remember { mutableStateOf(false) }
     var resetInput by remember { mutableStateOf("") }
+    var showNewProjectDialog by remember { mutableStateOf(false) }
+    var showDeleteProjectDialog by remember { mutableStateOf(false) }
 
     if (showResetDialog) {
         ResetConfirmDialog(
@@ -38,6 +45,27 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                 showResetDialog = false
                 resetInput = ""
             }
+        )
+    }
+
+    if (showNewProjectDialog) {
+        NewProjectDialog(
+            onCreate = { name, domain, description ->
+                controller.createProject(name, domain, description)
+                showNewProjectDialog = false
+            },
+            onDismiss = { showNewProjectDialog = false }
+        )
+    }
+
+    if (showDeleteProjectDialog && activeProject != null) {
+        DeleteProjectDialog(
+            projectName = activeProject.name,
+            onConfirm = {
+                controller.deleteProject(activeProject.id)
+                showDeleteProjectDialog = false
+            },
+            onDismiss = { showDeleteProjectDialog = false }
         )
     }
 
@@ -58,8 +86,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                         Text("Controlled agent specialisation loop", color = OnSurfaceDim, fontSize = 12.sp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        DomainBadge(state.domain)
-                        ModeBadge()
+                        activeProject?.let { ProjectBadge(it.name) }
                     }
                 }
 
@@ -73,28 +100,31 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(state.statusMessage, color = OnSurfaceDim, fontSize = 12.sp)
-                    when {
-                        state.isRunning -> Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                                color = AccentCyan
-                            )
-                            Text(
-                                state.currentPhase.name.replace("_", " "),
-                                color = AccentCyan,
-                                fontSize = 11.sp
-                            )
+                    Text(activeProject?.statusMessage ?: "Create a project to begin.", color = OnSurfaceDim, fontSize = 12.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(state.llmLabel, color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        when {
+                            activeProject?.isRunning == true -> Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(14.dp),
+                                    strokeWidth = 2.dp,
+                                    color = AccentCyan
+                                )
+                                Text(
+                                    activeProject.currentPhase.name.replace("_", " "),
+                                    color = AccentCyan,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            activeProject?.currentPhase == Phase.DONE ->
+                                Text("DONE", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            activeProject?.currentPhase == Phase.IDLE && activeProject.candidates.isNotEmpty() ->
+                                Text("STOPPED", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            else -> {}
                         }
-                        state.currentPhase == Phase.DONE ->
-                            Text("● DONE", color = SuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        state.currentPhase == Phase.IDLE && state.candidates.isNotEmpty() ->
-                            Text("● STOPPED", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        else -> {}
                     }
                 }
 
@@ -103,7 +133,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (state.isRunning) {
+                    if (activeProject?.isRunning == true) {
                         // While running: show only Stop prominently
                         Button(
                             onClick = controller::stopEvolution,
@@ -125,21 +155,21 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                     } else {
                         ActionButton(
                             label = "▶  Run Evolution",
-                            enabled = true,
+                            enabled = activeProject != null,
                             primary = true,
                             onClick = controller::runEvolution,
                             modifier = Modifier.weight(1f)
                         )
                         ActionButton(
                             label = "✓  Final Evaluation",
-                            enabled = state.lastResult != null,
+                            enabled = activeProject?.lastResult != null,
                             primary = false,
                             onClick = controller::runFinalEvaluation,
                             modifier = Modifier.weight(1f)
                         )
                         ActionButton(
                             label = "↓  Export Report",
-                            enabled = state.lastResult != null,
+                            enabled = activeProject?.lastResult != null,
                             primary = false,
                             onClick = controller::exportReport,
                             modifier = Modifier.weight(1f)
@@ -164,16 +194,26 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                 ) {
                     // Left column: settings + metrics + tools
                     Column(
-                        modifier = Modifier.width(240.dp).fillMaxHeight(),
+                        modifier = Modifier.width(300.dp).fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        SettingsPanel(
-                            domain = state.domain,
-                            isRunning = state.isRunning,
-                            onDomainApply = controller::setDomain
+                        ProjectMenuPanel(
+                            projects = state.projects,
+                            activeProjectId = state.activeProjectId,
+                            onSelect = controller::selectProject,
+                            onNewProject = { showNewProjectDialog = true },
+                            onDeleteProject = { showDeleteProjectDialog = true },
+                            modifier = Modifier.weight(0.34f)
                         )
-                        MetricsPanel(metrics = state.metrics)
-                        ToolRegistryPanel(tools = state.selectedTools, modifier = Modifier.weight(1f))
+                        if (activeProject != null) {
+                            SettingsPanel(
+                                domain = activeProject.domain,
+                                isRunning = activeProject.isRunning,
+                                onDomainApply = controller::setDomain
+                            )
+                            MetricsPanel(metrics = activeProject.metrics)
+                            ToolRegistryPanel(tools = activeProject.selectedTools, modifier = Modifier.weight(0.66f))
+                        }
                     }
 
                     // Right column: candidates + log
@@ -181,12 +221,217 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                         modifier = Modifier.weight(1f).fillMaxHeight(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        CandidateListPanel(candidates = state.candidates, modifier = Modifier.weight(0.42f))
-                        EvolutionLogPanel(logs = state.logs, modifier = Modifier.weight(0.58f))
+                        CandidateListPanel(candidates = activeProject?.candidates.orEmpty(), modifier = Modifier.weight(0.42f))
+                        EvolutionLogPanel(logs = activeProject?.logs.orEmpty(), modifier = Modifier.weight(0.58f))
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DeleteProjectDialog(
+    projectName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardBackground,
+        title = { Text("Delete Project?", color = ErrorRed, fontWeight = FontWeight.Bold) },
+        text = {
+            Text(
+                "Delete \"$projectName\" and its local runs/reports?",
+                color = OnSurface,
+                fontSize = 13.sp
+            )
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = ErrorRed),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Delete", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                border = BorderStroke(1.dp, SurfaceVariant),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Cancel", color = OnSurfaceDim)
+            }
+        }
+    )
+}
+
+@Composable
+private fun NewProjectDialog(
+    onCreate: (name: String, domain: String, description: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var domain by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val canCreate = domain.trim().isNotBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = CardBackground,
+        title = { Text("New Project", color = OnSurface, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                DialogField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = "Name",
+                    placeholder = "e.g. SQL Review"
+                )
+                DialogField(
+                    value = domain,
+                    onValueChange = { domain = it },
+                    label = "Domain",
+                    placeholder = "e.g. SQL Optimizer"
+                )
+                DialogField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = "Description",
+                    placeholder = "Optional project notes"
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onCreate(name, domain, description) },
+                enabled = canCreate,
+                colors = ButtonDefaults.buttonColors(containerColor = PrimaryGreen),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Create", color = androidx.compose.ui.graphics.Color.Black, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                border = BorderStroke(1.dp, SurfaceVariant),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Cancel", color = OnSurfaceDim)
+            }
+        }
+    )
+}
+
+@Composable
+private fun DialogField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    placeholder: String
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label, color = OnSurfaceDim) },
+        placeholder = { Text(placeholder, color = OnSurfaceDim) },
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = AccentCyan,
+            unfocusedBorderColor = SurfaceVariant,
+            focusedTextColor = OnSurface,
+            unfocusedTextColor = OnSurface,
+            cursorColor = AccentCyan
+        ),
+        modifier = Modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun ProjectMenuPanel(
+    projects: List<com.stemlab.app.ProjectViewState>,
+    activeProjectId: String?,
+    onSelect: (String) -> Unit,
+    onNewProject: () -> Unit,
+    onDeleteProject: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    PanelCard(title = "Projects", modifier = modifier) {
+        Button(
+            onClick = onNewProject,
+            modifier = Modifier.fillMaxWidth().height(34.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = PrimaryGreen,
+                contentColor = androidx.compose.ui.graphics.Color.Black
+            ),
+            shape = RoundedCornerShape(6.dp),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text("+ New Project", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+        }
+        Spacer(Modifier.height(6.dp))
+        OutlinedButton(
+            onClick = onDeleteProject,
+            enabled = activeProjectId != null,
+            modifier = Modifier.fillMaxWidth().height(30.dp),
+            border = BorderStroke(1.dp, ErrorRed.copy(alpha = 0.5f)),
+            shape = RoundedCornerShape(6.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = ErrorRed,
+                disabledContentColor = OnSurfaceDim
+            ),
+            contentPadding = PaddingValues(0.dp)
+        ) {
+            Text("Delete Selected", fontSize = 11.sp)
+        }
+        Spacer(Modifier.height(10.dp))
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxSize()) {
+            items(projects) { project ->
+                ProjectRow(
+                    project = project,
+                    selected = project.id == activeProjectId,
+                    onClick = { onSelect(project.id) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProjectRow(
+    project: com.stemlab.app.ProjectViewState,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    val borderColor = when {
+        selected -> PrimaryGreen
+        project.isRunning -> AccentCyan
+        else -> SurfaceVariant
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(7.dp))
+            .background(if (selected) PrimaryGreenVariant.copy(alpha = 0.22f) else SurfaceVariant)
+            .border(1.dp, borderColor, RoundedCornerShape(7.dp))
+            .clickable(onClick = onClick)
+            .padding(9.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(project.name, color = OnSurface, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            if (project.isRunning) {
+                Text("RUNNING", color = AccentCyan, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Spacer(Modifier.height(3.dp))
+        Text(project.domain, color = OnSurfaceDim, fontSize = 11.sp)
     }
 }
 
@@ -259,26 +504,14 @@ private fun ResetConfirmDialog(
 }
 
 @Composable
-private fun DomainBadge(domain: String) {
+private fun ProjectBadge(name: String) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(PrimaryGreenVariant.copy(alpha = 0.3f))
             .padding(horizontal = 12.dp, vertical = 5.dp)
     ) {
-        Text(domain, color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun ModeBadge() {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(WarningAmber.copy(alpha = 0.15f))
-            .padding(horizontal = 10.dp, vertical = 5.dp)
-    ) {
-        Text("OPENAI", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(name, color = SuccessGreen, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

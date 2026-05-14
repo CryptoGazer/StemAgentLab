@@ -10,7 +10,9 @@
 **Stem Agent Lab** is a Kotlin Compose Multiplatform Desktop application that demonstrates a controlled _stem agent specialisation loop_:
 
 ```
-Domain input
+Create/select project
+    ↓
+Project domain input
     ↓
 Baseline agent evaluated on benchmark tasks
     ↓
@@ -24,7 +26,7 @@ SpecializedAgent frozen with winning configuration
     ↓
 UI shows before/after metrics + logs
     ↓
-Export → reports/report-<runId>.md
+Export → projects/<projectId>/reports/report-<runId>.md
 ```
 
 The agent does **not** rewrite source code. It generates and evaluates `AgentConfig` objects — structured data specifying tools, skills, prompt strategy, and token budget.
@@ -99,8 +101,8 @@ StemAgentLab/
 │   │   │   ├── Main.kt                ← entry point; system tray + Window
 │   │   │   │
 │   │   │   ├── app/
-│   │   │   │   ├── AppController.kt   ← orchestration: runEvolution, stopEvolution, resetAll, setDomain, exportReport
-│   │   │   │   ├── AppState.kt        ← AppState data class + Phase enum + Metrics
+│   │   │   │   ├── AppController.kt   ← project orchestration: create/select projects, run/stop/export per project
+│   │   │   │   ├── AppState.kt        ← AppState + ProjectViewState + Phase enum + Metrics
 │   │   │   │   └── DemoScenario.kt    ← loads bundled python_qa_tasks.json
 │   │   │   │
 │   │   │   ├── ui/
@@ -123,7 +125,8 @@ StemAgentLab/
 │   │   │   │   │   ├── EvalTask.kt            ← id, description, code, expectedIssueKeywords
 │   │   │   │   │   ├── EvalResult.kt          ← taskId, agentId, agentResponse, matchedKeywords, score, tokensUsed, costEstimate
 │   │   │   │   │   ├── Budget.kt              ← maxTokens, maxCost, maxCandidates, maxRounds
-│   │   │   │   │   └── EvolutionResult.kt     ← runId, domain, candidates, selectedCandidateId, improvement, logs, timestamp
+│   │   │   │   │   ├── EvolutionResult.kt     ← runId, domain, candidates, selectedCandidateId, improvement, logs, timestamp
+│   │   │   │   │   └── ProjectSpec.kt         ← project id/name/domain/description and latest run metadata
 │   │   │   │   │
 │   │   │   │   ├── agent/
 │   │   │   │   │   ├── BaselineAgent.kt       ← no tools, direct reasoning only
@@ -165,10 +168,11 @@ StemAgentLab/
 │   │   │   │
 │   │   │   ├── storage/
 │   │   │   │   ├── JsonStorage.kt            ← save/load<T> using kotlinx.serialization; @PublishedApi internal json
-│   │   │   │   └── RunHistoryStore.kt        ← saves EvolutionResult to runs/<runId>.json; loadAll() + latest()
+│   │   │   │   ├── ProjectStore.kt           ← projects/index.json + projects/<projectId>/runs + reports
+│   │   │   │   └── RunHistoryStore.kt        ← legacy global run store
 │   │   │   │
 │   │   │   ├── report/
-│   │   │   │   └── MarkdownReportExporter.kt ← export() writes to reports/report-<runId>.md; buildReport() is pure
+│   │   │   │   └── MarkdownReportExporter.kt ← export() writes reports; buildReport() is pure
 │   │   │   │
 │   │   │   └── util/
 │   │   │       └── DotEnvLoader.kt           ← reads OPENAI_API_KEY from env var, then .env file
@@ -193,8 +197,7 @@ StemAgentLab/
 │           ├── CandidateConfigParserTest.kt   ← 7 tests: valid JSON, IDs, tools, invalid JSON, wrong count, prose surrounding, empty string
 │           └── ToolRegistryTest.kt            ← 7 tests: known tool, unknown → generic, mixed, cost > 0, readable name, empty, all 6 known tools
 │
-├── runs/                              ← auto-created; JSON run history (one file per run)
-└── reports/                           ← auto-created; Markdown reports (one file per run)
+└── projects/                          ← auto-created local project data; gitignored
 ```
 
 ---
@@ -212,6 +215,9 @@ All agent responses now come from `OpenAiLlmClient`. Scoring is still determinis
 ### Single propose-evaluate cycle
 `EvolutionEngine` always passes `round = 0` to `StopCriteria.shouldStop()`. `maxRounds = 2` in `Budget` is therefore never violated in the current implementation. This is intentional — the engine runs exactly one cycle: propose → evaluate → select.
 
+### Project sessions
+`AppController` manages a list of `ProjectViewState` objects and a `projectJobs` map keyed by `projectId`. Each project has its own phase, logs, metrics, selected tools, latest result, export path, and optional running job. One project cannot be started twice, but different projects can run concurrently.
+
 ### StateFlow + coroutines for UI reactivity
 `AppController` holds a single `MutableStateFlow<AppState>`. The UI calls `collectAsState()` and recomposes on every update. No business logic lives in Compose composables.
 
@@ -222,7 +228,7 @@ All agent responses now come from `OpenAiLlmClient`. Scoring is still determinis
 
 ## 6. Evolution Log — What You See in the UI
 
-The **Evolution Log** panel (bottom-right) shows all entries from `AppController.log()`. Each line is timestamped `[HH:MM]`. Colour coding in `EvolutionLogPanel`:
+The **Evolution Log** panel (bottom-right) shows entries for the active project. Each line is timestamped `[HH:MM]`. Colour coding in `EvolutionLogPanel`:
 - **Cyan** — lines containing "score" / "Score"
 - **Green** — lines containing "Selected" / "complete"
 - **Red** — lines containing "Rejected" / "ERROR"
@@ -293,18 +299,20 @@ Candidate configurations are generated by OpenAI through `PromptTemplates.candid
 ./gradlew test
 ```
 
-### Test suite (56 tests total across 8 files)
+### Test suite
 
 | File | Tests | What it covers |
 |------|-------|----------------|
 | `ScoreCalculatorTest` | 6 | Keyword matching, scoring formula, edge cases |
 | `VersionManagerTest` | 4 | Candidate selection, ratio logic, SELECTED status |
-| `EvolutionEngineTest` | 6 | Full mock run, B selected, log milestones, score ordering |
+| `EvolutionEngineTest` | 1 | Live OpenAI evolution smoke test with structural assertions |
 | `StopCriteriaTest` | 8 | shouldStop on all 4 axes, isAcceptable |
 | `MarkdownReportExporterTest` | 11 | Report content, file creation, graceful no-candidate case |
-| `TaskGeneratorTest` | 7 | Python domain, generic domain, count limit, keyword presence |
+| `TaskGeneratorTest` | 1 | Live OpenAI task generation structure |
 | `CandidateConfigParserTest` | 7 | Valid JSON, malformed JSON, wrong count, prose-wrapped JSON |
 | `ToolRegistryTest` | 7 | Known tools, unknown → generic fallback, empty list |
+| `ProjectStoreTest` | 2 | Project index and per-project run paths |
+| `AppControllerProjectTest` | 2 | Project creation/selection and independent project sessions with fake LLM |
 
 ### Watching test output
 
@@ -314,9 +322,8 @@ Candidate configurations are generated by OpenAI through `PromptTemplates.candid
 
 ### What is NOT tested (known gaps)
 
-- OpenAiLlmClient (requires live network + API key)
+- OpenAiLlmClient HTTP internals beyond live smoke coverage
 - Compose UI components (no headless UI test harness configured)
-- RunHistoryStore file I/O (low risk, tested implicitly via EvolutionEngine)
 - DotEnvLoader (trivial, no secret to test with)
 
 ---

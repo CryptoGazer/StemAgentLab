@@ -28,27 +28,19 @@ This approach is intentionally simple and deterministic — the goal is to demon
 
 ---
 
-## 3. Results (Mock Mode)
+## 3. Results
 
-| Agent | Score | Tokens | Cost | Status |
-|-------|-------|--------|------|--------|
-| Baseline | 0.314 | ~1600 | $0.0032 | Rejected |
-| Candidate A | 0.543 | ~3400 | $0.0068 | Rejected |
-| **Candidate B** | **0.857** | ~4700 | **$0.0094** | ✅ Selected |
-| Candidate C | 0.771 | ~7600 | $0.0152 | Rejected |
-
-**Improvement: +172% over baseline.**
-
-Candidate C scores lower than B despite having more tools, demonstrating that adding tools without improving accuracy still loses on score/cost ratio.
+Live OpenAI responses vary by model output, so fixed mock score tables are no longer part of the product behavior. Reports now capture the actual score, token, and cost values for each project run.
 
 ---
 
 ## 4. Architecture Decisions
 
+- **Project sessions** — each project has its own phase, logs, latest result, report path, and running job, while `EvolutionEngine` remains stateless.
 - **StateFlow + coroutines** — the UI reacts to a single `AppState` emitted by `AppController`, keeping the Compose UI free of business logic.
 - **Required OpenAI client** — the `LlmClient` interface is backed by `OpenAiLlmClient`; startup fails clearly if `OPENAI_API_KEY` is absent.
 - **Keyword scoring** — chosen over LLM-as-judge so returned model text can be scored consistently against benchmark expectations.
-- **No database** — run history is persisted as JSON files in `runs/`, keeping the project self-contained.
+- **No database** — project metadata and run history are persisted as JSON files under `projects/`, keeping the project self-contained.
 
 ---
 
