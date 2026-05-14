@@ -222,7 +222,7 @@ class AppController(
                         lastResult = resultWithLogs,
                         frozenAgent = frozenAgent ?: current.frozenAgent,
                         statusMessage = if (selected != null)
-                            "Done — ${selected.config.name} selected (+${"%.1f".format(resultWithLogs.improvementPercent)}%)"
+                            "Done — ${selected.config.name} frozen → projects/$projectId/agent.json"
                         else
                             "Done — no candidate outperformed baseline"
                     )
