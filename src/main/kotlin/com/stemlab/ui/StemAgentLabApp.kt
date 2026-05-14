@@ -5,6 +5,7 @@ import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,6 +19,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -36,6 +39,8 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
     var resetInput by remember { mutableStateOf("") }
     var showNewProjectDialog by remember { mutableStateOf(false) }
     var showDeleteProjectDialog by remember { mutableStateOf(false) }
+    var rightPaneHeightPx by remember { mutableStateOf(1) }
+    var candidatePaneFraction by remember { mutableStateOf(0.42f) }
 
     if (showResetDialog) {
         ResetConfirmDialog(
@@ -161,7 +166,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                             Text("■  Stop Evolution", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                         }
                         // Grayed-out placeholders so layout doesn't jump
-                        repeat(3) {
+                        repeat(4) {
                             OutlinedButton(
                                 onClick = {},
                                 enabled = false,
@@ -182,6 +187,13 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                             enabled = activeProject?.lastResult != null,
                             primary = false,
                             onClick = controller::runFinalEvaluation,
+                            modifier = Modifier.weight(1f)
+                        )
+                        ActionButton(
+                            label = "⟳  Eval Frozen",
+                            enabled = activeProject?.frozenAgent != null,
+                            primary = false,
+                            onClick = controller::evaluateFrozenAgent,
                             modifier = Modifier.weight(1f)
                         )
                         ActionButton(
@@ -237,7 +249,10 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
 
                     // Right column: candidates + log
                     Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .onSizeChanged { rightPaneHeightPx = it.height.coerceAtLeast(1) },
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         CandidateListPanel(
@@ -245,9 +260,23 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                                 project.candidates.filterNot { it.id in project.dismissedCandidateIds }
                             }.orEmpty(),
                             onDismissRejected = controller::dismissRejectedCandidate,
-                            modifier = Modifier.weight(0.42f)
+                            modifier = Modifier.weight(candidatePaneFraction)
                         )
-                        EvolutionLogPanel(logs = activeProject?.logs.orEmpty(), modifier = Modifier.weight(0.58f))
+                        VerticalResizeHandle(
+                            onDrag = { deltaY ->
+                                val deltaFraction = deltaY / rightPaneHeightPx.toFloat()
+                                candidatePaneFraction = (candidatePaneFraction + deltaFraction).coerceIn(0.22f, 0.72f)
+                            }
+                        )
+                        FrozenAgentPanel(
+                            frozenAgent = activeProject?.frozenAgent,
+                            modifier = Modifier.height(190.dp)
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        EvolutionLogPanel(
+                            logs = activeProject?.logs.orEmpty(),
+                            modifier = Modifier.weight(1f - candidatePaneFraction)
+                        )
                     }
                 }
             }
@@ -257,6 +286,31 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun VerticalResizeHandle(onDrag: (Float) -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(10.dp)
+            .clip(RoundedCornerShape(5.dp))
+            .background(SurfaceVariant.copy(alpha = 0.55f))
+            .pointerInput(Unit) {
+                detectVerticalDragGestures { _, dragAmount ->
+                    onDrag(dragAmount)
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .width(56.dp)
+                .height(2.dp)
+                .clip(RoundedCornerShape(1.dp))
+                .background(OnSurfaceDim.copy(alpha = 0.7f))
+        )
     }
 }
 

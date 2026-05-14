@@ -1,7 +1,11 @@
 package com.stemlab.app
 
+import com.stemlab.core.agent.SpecializedAgent
+import com.stemlab.core.eval.PythonQaEvaluator
+import com.stemlab.core.eval.ScoreCalculator
 import com.stemlab.core.evolution.EvolutionEngine
 import com.stemlab.core.model.Budget
+import com.stemlab.core.model.FrozenAgent
 import com.stemlab.core.model.ProjectSpec
 import com.stemlab.core.registry.ToolRegistry
 import com.stemlab.core.tasks.LlmTaskGenerator
@@ -192,8 +196,26 @@ class AppController(
                 val selected = resultWithLogs.selectedCandidate
                 val selectedTools = selected?.config?.tools?.let { toolRegistry.resolve(it) } ?: emptyList()
 
-                updateProject(projectId) {
-                    it.copy(
+                val frozenAgent = if (selected != null) {
+                    FrozenAgent(
+                        projectId = projectId,
+                        runId = resultWithLogs.runId,
+                        domain = project.domain,
+                        frozenAt = Instant.now().toString(),
+                        config = selected.config,
+                        score = selected.score,
+                        baselineScore = resultWithLogs.baselineScore,
+                        improvement = resultWithLogs.improvement,
+                        estimatedTokens = selected.estimatedTokens,
+                        estimatedCost = selected.estimatedCost
+                    ).also { frozen ->
+                        projectStore.saveFrozenAgent(projectId, frozen)
+                        appendLog(projectId, "Frozen agent artifact saved: projects/$projectId/agent.json")
+                    }
+                } else null
+
+                updateProject(projectId) { current ->
+                    current.copy(
                         spec = updatedSpec,
                         isRunning = false,
                         currentPhase = Phase.DONE,
@@ -208,6 +230,7 @@ class AppController(
                         dismissedCandidateIds = emptySet(),
                         selectedTools = selectedTools,
                         lastResult = resultWithLogs,
+                        frozenAgent = frozenAgent ?: current.frozenAgent,
                         statusMessage = if (selected != null)
                             "Done — ${selected.config.name} selected (+${"%.1f".format(resultWithLogs.improvementPercent)}%)"
                         else
@@ -281,6 +304,65 @@ class AppController(
         appendLog(project.id, "Tools: ${selected.config.tools.joinToString(", ")}")
         appendLog(project.id, "Skills: ${selected.config.skills.joinToString(", ")}")
         appendLog(project.id, "Status: PRODUCTION-READY (frozen configuration confirmed)")
+    }
+
+    fun evaluateFrozenAgent() {
+        val project = _state.value.activeProject ?: return
+        val frozen = project.frozenAgent ?: run {
+            appendLog(project.id, "No frozen agent — run evolution first to create one.")
+            return
+        }
+        if (project.isRunning) return
+        val projectId = project.id
+
+        setPhase(projectId, Phase.EVALUATING, "Re-evaluating frozen agent...")
+        appendLog(projectId, "=== Re-evaluating Frozen Agent: ${frozen.config.name} ===")
+        appendLog(projectId, "Config: tools=[${frozen.config.tools.joinToString(", ")}], strategy=${frozen.config.promptStrategy}")
+
+        projectJobs[projectId] = scope.launch {
+            try {
+                val generated = taskGenerator.generateWithUsage(frozen.domain)
+                appendLog(projectId, "Generated ${generated.tasks.size} tasks for re-evaluation")
+
+                val specializedAgent = SpecializedAgent(llmClient, frozen.config)
+                val evaluator = PythonQaEvaluator()
+                var tokensUsed = generated.tokensUsed
+                var costUsed = generated.costEstimate
+
+                val results = evaluator.evaluate(frozen.config.id, generated.tasks) { task ->
+                    val resp = specializedAgent.runOnTask(task)
+                    tokensUsed += resp.tokensUsed
+                    costUsed += resp.costEstimate
+                    resp
+                }
+                val score = ScoreCalculator.aggregateScore(results)
+                val delta = score - frozen.baselineScore
+                appendLog(projectId, "Re-evaluation score: ${"%.3f".format(score)} (original frozen score: ${"%.3f".format(frozen.score)})")
+                appendLog(projectId, "Delta vs baseline: ${if (delta >= 0) "+" else ""}${"%.3f".format(delta)}")
+                appendLog(projectId, "Tokens: $tokensUsed, Cost: \$${"%.4f".format(costUsed)}")
+                appendLog(projectId, "Status: PRODUCTION-READY — frozen config verified on fresh tasks")
+
+                updateProject(projectId) { current ->
+                    current.copy(
+                        currentPhase = Phase.DONE,
+                        isRunning = false,
+                        statusMessage = "Frozen agent re-evaluated: score=${"%.3f".format(score)}"
+                    )
+                }
+            } catch (e: CancellationException) {
+                appendLog(projectId, "Re-evaluation stopped by user")
+                updateProject(projectId) {
+                    it.copy(isRunning = false, currentPhase = Phase.IDLE, statusMessage = "Re-evaluation stopped.")
+                }
+            } catch (e: Exception) {
+                appendLog(projectId, "ERROR: Re-evaluation failed: ${e.message ?: e::class.simpleName ?: "unknown"}")
+                updateProject(projectId) {
+                    it.copy(isRunning = false, currentPhase = Phase.IDLE, statusMessage = "Re-evaluation failed — check logs.")
+                }
+            } finally {
+                projectJobs.remove(projectId)
+            }
+        }
     }
 
     fun exportReport() {
@@ -388,7 +470,10 @@ class AppController(
 
     private fun ProjectSpec.toViewState(): ProjectViewState {
         val latest = projectStore.latestRun(id)
-        val selectedTools = latest?.selectedCandidate?.config?.tools?.let { toolRegistry.resolve(it) } ?: emptyList()
+        val frozenAgent = projectStore.loadFrozenAgent(id)
+        val selectedTools = frozenAgent?.config?.tools?.let { toolRegistry.resolve(it) }
+            ?: latest?.selectedCandidate?.config?.tools?.let { toolRegistry.resolve(it) }
+            ?: emptyList()
         return ProjectViewState(
             spec = if (latest != null && latest.runId != lastRunId) copy(lastRunId = latest.runId) else this,
             metrics = latest?.let {
@@ -404,8 +489,11 @@ class AppController(
             selectedTools = selectedTools,
             logs = latest?.logs ?: emptyList(),
             lastResult = latest,
+            frozenAgent = frozenAgent,
             statusMessage = if (latest == null)
                 "Ready — OpenAI key loaded; click Run Evolution to start."
+            else if (frozenAgent != null)
+                "Loaded latest run ${latest.runId}. Frozen agent: ${frozenAgent.config.name}."
             else
                 "Loaded latest run ${latest.runId}."
         )

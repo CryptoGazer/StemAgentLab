@@ -2,6 +2,7 @@ package com.stemlab.app
 
 import com.stemlab.core.model.CandidateAgent
 import com.stemlab.core.model.EvolutionResult
+import com.stemlab.core.model.FrozenAgent
 import com.stemlab.core.model.ProjectSpec
 import com.stemlab.core.model.ToolSpec
 
@@ -29,6 +30,7 @@ data class ProjectViewState(
     val logs: List<String> = emptyList(),
     val lastResult: EvolutionResult? = null,
     val lastExportPath: String? = null,
+    val frozenAgent: FrozenAgent? = null,
     val statusMessage: String = "Ready — OpenAI key loaded; click Run Evolution to start."
 ) {
     val id: String get() = spec.id

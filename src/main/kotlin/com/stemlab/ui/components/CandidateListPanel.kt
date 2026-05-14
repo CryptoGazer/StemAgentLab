@@ -61,31 +61,36 @@ private fun CandidateRow(
     candidate: CandidateAgent,
     onDismissRejected: (String) -> Unit
 ) {
+    val isBaseline = candidate.id == "baseline"
     val borderColor = when (candidate.status) {
         CandidateStatus.SELECTED -> SuccessGreen
         CandidateStatus.EVALUATING -> AccentCyan
+        CandidateStatus.REJECTED if isBaseline -> OnSurfaceDim.copy(alpha = 0.35f)
         CandidateStatus.REJECTED -> WarningAmber.copy(alpha = 0.45f)
         CandidateStatus.PENDING -> SurfaceVariant
     }
     val progressColor = when (candidate.status) {
         CandidateStatus.SELECTED -> SuccessGreen
         CandidateStatus.EVALUATING -> AccentCyan
+        CandidateStatus.REJECTED if isBaseline -> SecondaryBlue
         CandidateStatus.REJECTED -> WarningAmber
         CandidateStatus.PENDING -> OnSurfaceDim
     }
     val badgeText = when (candidate.status) {
         CandidateStatus.SELECTED -> "✓ SELECTED"
         CandidateStatus.EVALUATING -> "…"
+        CandidateStatus.REJECTED if isBaseline -> "BASELINE"
         CandidateStatus.REJECTED -> "✗"
         CandidateStatus.PENDING -> "—"
     }
     val badgeColor = when (candidate.status) {
         CandidateStatus.SELECTED -> SuccessGreen
         CandidateStatus.EVALUATING -> AccentCyan
+        CandidateStatus.REJECTED if isBaseline -> SecondaryBlue
         CandidateStatus.REJECTED -> WarningAmber
         CandidateStatus.PENDING -> OnSurfaceDim
     }
-    val canDismiss = candidate.status == CandidateStatus.REJECTED && candidate.id != "baseline"
+    val canDismiss = candidate.status == CandidateStatus.REJECTED && !isBaseline
 
     Column(
         modifier = Modifier

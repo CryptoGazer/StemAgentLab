@@ -59,6 +59,23 @@ class ProjectStore(private val rootDir: String = "projects") {
     fun latestRun(projectId: String): EvolutionResult? = loadRuns(projectId).firstOrNull()
 
     @Synchronized
+    fun saveFrozenAgent(projectId: String, agent: com.stemlab.core.model.FrozenAgent) {
+        requireSafeProjectId(projectId)
+        JsonStorage.save(agent, frozenAgentPath(projectId))
+    }
+
+    @Synchronized
+    fun loadFrozenAgent(projectId: String): com.stemlab.core.model.FrozenAgent? {
+        requireSafeProjectId(projectId)
+        return JsonStorage.load<com.stemlab.core.model.FrozenAgent>(frozenAgentPath(projectId))
+    }
+
+    fun frozenAgentPath(projectId: String): String {
+        requireSafeProjectId(projectId)
+        return "${projectRoot(projectId)}/agent.json"
+    }
+
+    @Synchronized
     fun reportPath(projectId: String, runId: String): String =
         "${projectRoot(projectId)}/reports/report-${safeFileId(runId, "run id")}.md"
 

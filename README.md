@@ -250,7 +250,35 @@ Example:
 
 The same project cannot be started twice at the same time.
 
-### 5. Export a report
+### 5. Inspect the frozen agent
+
+After evolution completes and a candidate wins, the app **freezes** it as a persistent artifact:
+
+```text
+projects/<projectId>/agent.json
+```
+
+The **Frozen Agent** panel (right column, centre) shows:
+
+| Field | Description |
+|-------|-------------|
+| Name | Winning candidate name |
+| Domain | Project domain |
+| Score | Evaluation score on benchmark tasks |
+| vs Baseline | Percentage improvement over the baseline agent |
+| Tokens / Cost | Resource usage during this run |
+| Strategy | Prompt strategy (e.g. `chain-of-thought`) |
+| Tools | Tool IDs selected for this agent |
+| Skills | Skill IDs selected for this agent |
+| Frozen at | UTC timestamp when the config was locked |
+
+The frozen config persists across restarts. Switching to a previously run project reloads the panel automatically.
+
+### 6. Re-evaluate the frozen agent
+
+Click **⟳ Eval Frozen** to run the frozen agent on a fresh set of benchmark tasks **without** starting a new propose–evaluate cycle. This verifies that the selected configuration generalises beyond the tasks it was originally scored on. The results appear in the evolution log.
+
+### 7. Export a report
 
 After a run finishes, click `Export Report`.
 
