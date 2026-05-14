@@ -59,7 +59,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         DomainBadge(state.domain)
-                        ModeBadge(state.isMockMode)
+                        ModeBadge()
                     }
                 }
 
@@ -271,17 +271,14 @@ private fun DomainBadge(domain: String) {
 }
 
 @Composable
-private fun ModeBadge(isMock: Boolean) {
-    val label = if (isMock) "MOCK" else "OPENAI"
-    val bg = if (isMock) AccentCyan.copy(alpha = 0.15f) else WarningAmber.copy(alpha = 0.15f)
-    val fg = if (isMock) AccentCyan else WarningAmber
+private fun ModeBadge() {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(bg)
+            .background(WarningAmber.copy(alpha = 0.15f))
             .padding(horizontal = 10.dp, vertical = 5.dp)
     ) {
-        Text(label, color = fg, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text("OPENAI", color = WarningAmber, fontSize = 11.sp, fontWeight = FontWeight.Bold)
     }
 }
 

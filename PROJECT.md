@@ -51,14 +51,11 @@ The agent does **not** rewrite source code. It generates and evaluates `AgentCon
 ## 3. How to Run
 
 ```bash
-# Mock mode (no API key needed)
-./gradlew run
-
-# OpenAI mode — Option A: environment variable
+# OpenAI key is required — Option A: environment variable
 export OPENAI_API_KEY=sk-...
 ./gradlew run
 
-# OpenAI mode — Option B: .env file (gitignored, persists across restarts)
+# OpenAI key is required — Option B: .env file (gitignored, persists across restarts)
 echo 'OPENAI_API_KEY=sk-...' > .env
 ./gradlew run
 
@@ -130,7 +127,7 @@ StemAgentLab/
 │   │   │   │   │
 │   │   │   │   ├── agent/
 │   │   │   │   │   ├── BaselineAgent.kt       ← no tools, direct reasoning only
-│   │   │   │   │   ├── StemAgent.kt           ← proposeCandidates(); parses LLM JSON in OpenAI mode, uses defaultCandidatesFor() in mock mode
+│   │   │   │   │   ├── StemAgent.kt           ← proposeCandidates(); parses OpenAI JSON and fails loudly on invalid output
 │   │   │   │   │   ├── SpecializedAgent.kt    ← runs tool-augmented prompt for a given AgentConfig
 │   │   │   │   │   ├── CandidateAgentBuilder.kt ← builds (CandidateAgent, SpecializedAgent) pairs from configs
 │   │   │   │   │   └── CandidateConfigParser.kt ← parses {"candidates":[...]} JSON from LLM response; returns null on failure
@@ -153,12 +150,10 @@ StemAgentLab/
 │   │   │   │   │
 │   │   │   │   └── tasks/
 │   │   │   │       ├── TaskGenerator.kt       ← interface: generate(domain, count) → List<EvalTask>
-│   │   │   │       ├── MockTaskGenerator.kt   ← python/qa/code domain → bundled tasks; other → generic tasks
-│   │   │   │       └── LlmTaskGenerator.kt    ← calls LLM for real tasks; fallback to MockTaskGenerator on parse failure
+│   │   │   │       └── LlmTaskGenerator.kt    ← calls OpenAI for real tasks; invalid output is a visible error
 │   │   │   │
 │   │   │   ├── llm/
-│   │   │   │   ├── LlmClient.kt              ← interface: isMock + complete(prompt) → LlmResponse
-│   │   │   │   ├── MockLlmClient.kt          ← deterministic responses; coverage factor driven by tool IDs in prompt
+│   │   │   │   ├── LlmClient.kt              ← interface: complete(prompt) → LlmResponse
 │   │   │   │   ├── OpenAiLlmClient.kt        ← ktor POST to gpt-4o-mini; domain-agnostic system prompt
 │   │   │   │   └── PromptTemplates.kt        ← baseline(), toolAugmented(), candidateProposal(), generateTasks()
 │   │   │   │
@@ -211,14 +206,8 @@ StemAgentLab/
 
 The quadratic amplification means a 2× better score is 4× more attractive. This makes Candidate B win over Candidate A even though A is cheaper: B's score is ~58% better, so its ratio is ~2.5× higher.
 
-### Mock scoring via tool-ID coverage
-`MockLlmClient.coverageFor(toolIds)` returns a fixed factor based on which tools are present in the prompt:
-- No tools → 0.314 (baseline)
-- code_reader + static_analyzer → 0.543 (Candidate A)
-- code_reader + test_generator + python_runner + failure_analyzer → 0.857 (Candidate B)
-- ... + patch_suggester → 0.771 (Candidate C)
-
-This produces deterministic, reproducible before/after scores without an API key.
+### OpenAI-backed scoring
+All agent responses now come from `OpenAiLlmClient`. Scoring is still deterministic once text is returned: `ScoreCalculator` matches expected issue keywords in the OpenAI response. There is no runtime path that silently substitutes canned mock answers when the key is missing or OpenAI output is malformed.
 
 ### Single propose-evaluate cycle
 `EvolutionEngine` always passes `round = 0` to `StopCriteria.shouldStop()`. `maxRounds = 2` in `Budget` is therefore never violated in the current implementation. This is intentional — the engine runs exactly one cycle: propose → evaluate → select.
@@ -226,8 +215,8 @@ This produces deterministic, reproducible before/after scores without an API key
 ### StateFlow + coroutines for UI reactivity
 `AppController` holds a single `MutableStateFlow<AppState>`. The UI calls `collectAsState()` and recomposes on every update. No business logic lives in Compose composables.
 
-### Mock → OpenAI switch
-`DotEnvLoader.loadApiKey()` checks `System.getenv("OPENAI_API_KEY")` first, then reads `.env` in the working directory. If found, `OpenAiLlmClient` is used. Otherwise `MockLlmClient`. The switch happens once at startup in `AppController.buildLlmClient()`.
+### OpenAI key loading
+`DotEnvLoader.requireApiKey()` checks `System.getenv("OPENAI_API_KEY")` first, then reads `.env` in the working directory. If no key is found, startup fails with a clear error. Secrets are never hardcoded in Kotlin, Gradle, docs, or GitHub Actions.
 
 ---
 
@@ -243,14 +232,14 @@ Typical log sequence for a full run:
 
 ```
 [12:00] Evolution started: baseline → propose → evaluate → select
-[12:00] Generating tasks for domain: "Python QA" via bundled dataset (mock mode)
+[12:00] Generating tasks for domain: "Python QA" via OpenAI
 [12:00] Loaded 5 evaluation tasks
 [12:00] [abc12345] Evolution started — domain: Python QA
 [12:00] [abc12345] Loaded 5 evaluation tasks from dataset
 [12:00] [abc12345] Running Baseline Agent on 5 tasks...
 [12:00] [abc12345] Baseline score: 0.314 (avg keyword match)
 [12:00] [abc12345] StemAgent proposing candidate configurations...
-[12:00] [abc12345] Generated 3 candidates [default (mock mode)]: Candidate A, Candidate B, Candidate C
+[12:00] [abc12345] Generated 3 candidates [OpenAI-parsed]: Candidate A, Candidate B, Candidate C
 [12:00] [abc12345] Evaluating Candidate A...
 [12:00] [abc12345] Candidate A score: 0.543 (Δ+0.229)
 [12:00] [abc12345] Evaluating Candidate B...
@@ -267,68 +256,32 @@ Typical log sequence for a full run:
 
 ---
 
-## 7. Mock Mode — How It Works and How to Extend It
-
-### Architecture of the mock system
+## 7. OpenAI Mode — How It Works and How to Extend It
 
 ```
 AppController.runEvolution()
-    └── MockTaskGenerator.generate(domain)       ← selects/generates tasks
+    └── LlmTaskGenerator.generate(domain)        ← asks OpenAI for EvalTask JSON
     └── EvolutionEngine.run(domain, tasks, onLog)
-            └── MockLlmClient.complete(prompt)   ← called per task per agent
-                    └── coverageFor(toolIds)     ← determines how many keywords are matched
-                    └── buildResponse(...)       ← returns a fake analysis text
+            └── OpenAiLlmClient.complete(prompt) ← called for baseline, candidate proposal, and candidate evaluation
+                    └── ScoreCalculator          ← scores returned text against expectedIssueKeywords
 ```
 
-### Adding a new domain to mock mode
+### Adding a new domain
 
-**Step 1** — Add a task-set branch in [MockTaskGenerator.kt](src/main/kotlin/com/stemlab/core/tasks/MockTaskGenerator.kt):
+The task generator prompt in [PromptTemplates.kt](src/main/kotlin/com/stemlab/llm/PromptTemplates.kt) is domain-driven. For a new domain, update `generateTasks()` with any schema constraints or examples the model should follow. The runtime should still return `EvalTask` JSON:
 
 ```kotlin
-override suspend fun generate(domain: String, count: Int): List<EvalTask> {
-    val lower = domain.lowercase()
-    return when {
-        lower.contains("python") || lower.contains("qa") -> DemoScenario.loadTasks().take(count)
-        lower.contains("sql") -> sqlTasksFor(domain).take(count)   // ← add branch
-        else -> genericTasksFor(domain).take(count)
-    }
-}
-
-private fun sqlTasksFor(domain: String): List<EvalTask> = listOf(
-    EvalTask("sql_001", "Detect N+1 query in $domain", "SELECT * FROM ...", listOf("N+1", "eager loading", "JOIN")),
-    // ...
+EvalTask(
+    id = "task_001",
+    description = "Detect N+1 query in SQL data access code",
+    code = "fun loadUsers() = users.map { loadOrders(it.id) }",
+    expectedIssueKeywords = listOf("N+1", "batch loading", "JOIN")
 )
 ```
 
-**Step 2** — Add a coverage pattern in [MockLlmClient.kt](src/main/kotlin/com/stemlab/llm/MockLlmClient.kt) `coverageFor()` if you add domain-specific tools:
+### Adding new candidate behavior
 
-```kotlin
-private fun coverageFor(toolIds: List<String>): Double = when {
-    toolIds.containsAll(listOf("sql_analyzer", "query_optimizer")) -> 0.82   // ← new pattern
-    toolIds.containsAll(listOf("code_reader", "test_generator", ...)) -> 0.857
-    // ...
-}
-```
-
-**Step 3** — Add task-specific keywords to the `taskKeywords` map in `MockLlmClient` so the mock responses contain relevant content:
-
-```kotlin
-private val taskKeywords = mapOf(
-    "sql_001" to listOf("N+1", "eager loading", "JOIN", "SELECT N"),
-    // ...
-)
-```
-
-### Adding a new mock candidate configuration
-
-In [StemAgent.kt](src/main/kotlin/com/stemlab/core/agent/StemAgent.kt) `defaultCandidatesFor()`, add a domain-specific branch or modify the existing configs:
-
-```kotlin
-private fun defaultCandidatesFor(domain: String): List<AgentConfig> {
-    val lower = domain.lowercase()
-    return if (lower.contains("sql")) sqlCandidates() else defaultPythonCandidates()
-}
-```
+Candidate configurations are generated by OpenAI through `PromptTemplates.candidateProposal()`, then validated by `CandidateConfigParser`. If the model returns malformed JSON or the wrong number of candidates, the run fails visibly instead of substituting hardcoded defaults.
 
 ---
 

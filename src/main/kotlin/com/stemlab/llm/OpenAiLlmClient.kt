@@ -16,8 +16,6 @@ class OpenAiLlmClient(
     private val model: String = "gpt-4o-mini"
 ) : LlmClient {
 
-    override val isMock: Boolean = false
-
     private val http = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })

@@ -10,6 +10,8 @@ jobs:
   build-macos:
     name: Build on macOS
     runs-on: macos-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -31,6 +33,9 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Verify OpenAI key is configured
+        run: test -n "$OPENAI_API_KEY"
+
       - name: Run tests
         run: ./gradlew test
 
@@ -47,6 +52,8 @@ jobs:
   build-windows:
     name: Build on Windows
     runs-on: windows-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -64,6 +71,10 @@ jobs:
             ~/.gradle/wrapper
           key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle.kts', '**/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
+
+      - name: Verify OpenAI key is configured
+        shell: bash
+        run: test -n "$OPENAI_API_KEY"
 
       - name: Run tests
         run: ./gradlew test

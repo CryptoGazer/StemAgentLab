@@ -17,4 +17,10 @@ object DotEnvLoader {
             ?.removeSurrounding("'")
             ?.takeIf { it.isNotBlank() }
     }
+
+    fun requireApiKey(): String = loadApiKey()
+        ?: error(
+            "OPENAI_API_KEY is required. Set it as an environment variable " +
+                "or create a local .env file with OPENAI_API_KEY=sk-..."
+        )
 }

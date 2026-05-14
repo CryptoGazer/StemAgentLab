@@ -46,15 +46,15 @@ Candidate C scores lower than B despite having more tools, demonstrating that ad
 ## 4. Architecture Decisions
 
 - **StateFlow + coroutines** — the UI reacts to a single `AppState` emitted by `AppController`, keeping the Compose UI free of business logic.
-- **Mock / Live switch** — the `LlmClient` interface is swapped at startup based on `OPENAI_API_KEY`. All downstream code is identical.
-- **Keyword scoring** — chosen over LLM-as-judge to keep the prototype fully deterministic and runnable without an API key.
+- **Required OpenAI client** — the `LlmClient` interface is backed by `OpenAiLlmClient`; startup fails clearly if `OPENAI_API_KEY` is absent.
+- **Keyword scoring** — chosen over LLM-as-judge so returned model text can be scored consistently against benchmark expectations.
 - **No database** — run history is persisted as JSON files in `runs/`, keeping the project self-contained.
 
 ---
 
 ## 5. Limitations
 
-- The mock responses are handcrafted — real keyword coverage would vary by model and prompt.
+- Live OpenAI responses can vary by model and prompt, so integration tests assert structural behavior instead of fixed candidate ordering.
 - The evaluator only checks keyword presence, not semantic correctness.
 - `PythonRunner` executes code in a subprocess without a true sandbox; do not run untrusted code.
 - OpenAI mode uses `gpt-4o-mini` for cost reasons; swap `model` in `OpenAiLlmClient` for stronger models.

@@ -7,6 +7,5 @@ data class LlmResponse(
 )
 
 interface LlmClient {
-    val isMock: Boolean
     suspend fun complete(prompt: String): LlmResponse
 }

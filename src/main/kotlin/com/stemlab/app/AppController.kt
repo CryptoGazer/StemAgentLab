@@ -5,7 +5,6 @@ import com.stemlab.core.model.Budget
 import com.stemlab.core.registry.ToolRegistry
 import com.stemlab.core.tasks.LlmTaskGenerator
 import com.stemlab.llm.LlmClient
-import com.stemlab.llm.MockLlmClient
 import com.stemlab.llm.OpenAiLlmClient
 import com.stemlab.report.MarkdownReportExporter
 import com.stemlab.storage.RunHistoryStore
@@ -28,21 +27,14 @@ class AppController {
 
     private var evolutionJob: Job? = null
 
-    private val llmClient: LlmClient = buildLlmClient().also { client ->
-        _state.update { it.copy(isMockMode = client.isMock) }
-    }
+    private val llmClient: LlmClient = buildLlmClient()
 
     private val taskGenerator = LlmTaskGenerator(llmClient)
 
     private fun buildLlmClient(): LlmClient {
-        val apiKey = DotEnvLoader.loadApiKey()
-        return if (!apiKey.isNullOrBlank()) {
-            log("OpenAI mode active (model: gpt-4o-mini)")
-            OpenAiLlmClient(apiKey)
-        } else {
-            log("Mock mode active — no OPENAI_API_KEY found")
-            MockLlmClient()
-        }
+        val apiKey = DotEnvLoader.requireApiKey()
+        log("OpenAI mode active (model: gpt-4o-mini)")
+        return OpenAiLlmClient(apiKey)
     }
 
     fun setDomain(domain: String) {
@@ -61,8 +53,7 @@ class AppController {
 
         evolutionJob = scope.launch {
             try {
-                val taskSource = if (llmClient.isMock) "bundled dataset (mock mode)" else "LLM generation"
-                log("Generating tasks for domain: \"$domain\" via $taskSource")
+                log("Generating tasks for domain: \"$domain\" via OpenAI")
                 val tasks = taskGenerator.generate(domain)
                 log("Loaded ${tasks.size} evaluation tasks")
 
@@ -109,6 +100,16 @@ class AppController {
             } catch (e: CancellationException) {
                 log("Evolution stopped by user")
                 _state.update { it.copy(isRunning = false, currentPhase = Phase.IDLE, statusMessage = "Stopped — click Run Evolution to start again") }
+                flushLogsToState()
+            } catch (e: Exception) {
+                log("ERROR: ${e.message ?: e::class.simpleName ?: "Evolution failed"}")
+                _state.update {
+                    it.copy(
+                        isRunning = false,
+                        currentPhase = Phase.IDLE,
+                        statusMessage = "OpenAI run failed — check logs and OPENAI_API_KEY."
+                    )
+                }
                 flushLogsToState()
             }
         }
@@ -158,7 +159,7 @@ class AppController {
         logs.clear()
         runCatching { java.io.File("runs").listFiles()?.forEach { it.delete() } }
         runCatching { java.io.File("reports").listFiles()?.forEach { it.delete() } }
-        _state.value = AppState(isMockMode = llmClient.isMock)
+        _state.value = AppState()
         log("All progress reset — clean slate")
         flushLogsToState()
     }

@@ -27,6 +27,5 @@ data class AppState(
     val logs: List<String> = emptyList(),
     val lastResult: EvolutionResult? = null,
     val lastExportPath: String? = null,
-    val statusMessage: String = "Ready — click Run Baseline to start the evolution loop.",
-    val isMockMode: Boolean = true
+    val statusMessage: String = "Ready — OpenAI key loaded; click Run Baseline to start the evolution loop."
 )

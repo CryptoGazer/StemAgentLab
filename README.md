@@ -17,28 +17,18 @@ A Kotlin Compose Multiplatform Desktop prototype demonstrating a controlled **st
 ### Run the application
 
 ```bash
-./gradlew run
-```
-
-The app starts in **Mock mode** by default (no API key required).
-
-### Run with OpenAI
-
-**Option A — one-time terminal export (session only):**
-```bash
 export OPENAI_API_KEY=sk-...
 ./gradlew run
 ```
 
-**Option B — `.env` file (recommended for local dev, persists across restarts):**
+Or create a local `.env` file (recommended for local dev, persists across restarts):
 ```bash
 # Create once in the project root — gitignored, never committed
 echo 'OPENAI_API_KEY=sk-...' > .env
 ./gradlew run
 ```
 
-The app reads `OPENAI_API_KEY` from the environment first, then falls back to `.env`.  
-The mode badge in the top-right corner switches from `MOCK` to `OPENAI`.
+The app requires an OpenAI key. It reads `OPENAI_API_KEY` from the environment first, then falls back to `.env`. If no key is present, startup fails with a clear configuration error.
 
 ### Run tests
 
@@ -110,7 +100,7 @@ src/main/kotlin/com/stemlab/
 │   ├── evolution/             ← EvolutionEngine, VersionManager, StopCriteria
 │   ├── eval/                  ← PythonQaEvaluator, ScoreCalculator
 │   └── registry/              ← ToolRegistry, SkillRegistry
-├── llm/                       ← LlmClient, MockLlmClient, OpenAiLlmClient
+├── llm/                       ← LlmClient, OpenAiLlmClient
 ├── tools/                     ← PythonRunner, FileReaderTool, ...
 ├── storage/                   ← JsonStorage, RunHistoryStore
 └── report/                    ← MarkdownReportExporter

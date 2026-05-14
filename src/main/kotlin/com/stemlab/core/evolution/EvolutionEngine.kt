@@ -48,8 +48,7 @@ class EvolutionEngine(
         onLog("[$runId] StemAgent proposing candidate configurations...")
         val stemAgent = StemAgent(llmClient)
         val candidateConfigs = stemAgent.proposeCandidates(domain, baselineScore)
-        val configSource = if (llmClient.isMock) "default (mock mode)" else "LLM-parsed"
-        onLog("[$runId] Generated ${candidateConfigs.size} candidates [$configSource]: ${candidateConfigs.joinToString(", ") { it.name }}")
+        onLog("[$runId] Generated ${candidateConfigs.size} candidates [OpenAI-parsed]: ${candidateConfigs.joinToString(", ") { it.name }}")
 
         // 3. Evaluate candidates
         val builder = CandidateAgentBuilder(llmClient)
