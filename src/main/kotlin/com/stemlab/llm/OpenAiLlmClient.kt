@@ -67,8 +67,8 @@ class OpenAiLlmClient(
             val shouldRetry = response.status == HttpStatusCode.TooManyRequests ||
                 response.status.value in listOf(500, 502, 503, 504)
             if (!shouldRetry || attempt >= maxRetries) {
-                val body = runCatching { response.bodyAsText().take(400) }.getOrDefault("")
-                error("OpenAI request failed: HTTP ${response.status.value} ${response.status.description}. $body")
+                val body = runCatching { sanitizeErrorBody(response.bodyAsText()) }.getOrDefault("")
+                error("OpenAI request failed: HTTP ${response.status.value} ${response.status.description}.$body")
             }
 
             delay(retryDelayMillis(response, attempt))
@@ -82,6 +82,15 @@ class OpenAiLlmClient(
             return retryAfterSeconds * 1000L
         }
         return 1000L * (attempt + 1)
+    }
+
+    private fun sanitizeErrorBody(body: String): String {
+        val sanitized = body
+            .replace(Regex("sk-[A-Za-z0-9_-]+"), "[redacted]")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(240)
+        return if (sanitized.isBlank()) "" else " $sanitized"
     }
 
     @Serializable

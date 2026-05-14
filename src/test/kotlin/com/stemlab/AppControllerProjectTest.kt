@@ -74,6 +74,45 @@ class AppControllerProjectTest {
     }
 
     @Test
+    fun `updates active project name and domain together`() {
+        val (controller, dir) = controller()
+        try {
+            controller.updateActiveProject("Python Bug Hunt", "Python Edge Cases", "Renamed project")
+
+            val project = controller.state.value.activeProject
+            assertNotNull(project)
+            assertEquals("Python Bug Hunt", project.name)
+            assertEquals("Python Edge Cases", project.domain)
+            assertEquals("Renamed project", project.spec.description)
+            assertTrue(project.lastResult == null)
+        } finally {
+            controller.close()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `sanitizes project text fields before saving`() {
+        val (controller, dir) = controller()
+        try {
+            controller.createProject(
+                name = "  SQL\n\nReview  ",
+                domain = "  SQL\tOptimizer  ",
+                description = "  Notes\nwith   spacing  "
+            )
+
+            val project = controller.state.value.activeProject
+            assertNotNull(project)
+            assertEquals("SQL Review", project.name)
+            assertEquals("SQL Optimizer", project.domain)
+            assertEquals("Notes with spacing", project.spec.description)
+        } finally {
+            controller.close()
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `runs two projects as independent sessions`() = runBlocking {
         val (controller, dir) = controller()
         try {

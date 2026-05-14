@@ -77,10 +77,10 @@ jobs:
         run: test -n "$OPENAI_API_KEY"
 
       - name: Run tests
-        run: ./gradlew test
+        run: .\gradlew.bat test
 
       - name: Build distribution (MSI)
-        run: ./gradlew packageMsi
+        run: .\gradlew.bat packageMsi
 
       - name: Upload MSI artifact
         uses: actions/upload-artifact@v4

@@ -78,7 +78,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
         Surface(modifier = Modifier.fillMaxSize(), color = SurfaceDark) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val outerScrollState = rememberScrollState()
-                val mainContentHeight = (maxHeight - 156.dp).coerceAtLeast(560.dp)
+                val mainContentHeight = (maxHeight - 156.dp).coerceAtLeast(720.dp)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -220,13 +220,15 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                             onSelect = controller::selectProject,
                             onNewProject = { showNewProjectDialog = true },
                             onDeleteProject = { showDeleteProjectDialog = true },
-                            modifier = Modifier.weight(0.34f)
+                            modifier = Modifier.height(220.dp)
                         )
                         if (activeProject != null) {
                             SettingsPanel(
+                                projectName = activeProject.name,
                                 domain = activeProject.domain,
+                                description = activeProject.spec.description,
                                 isRunning = activeProject.isRunning,
-                                onDomainApply = controller::setDomain
+                                onApply = controller::updateActiveProject
                             )
                             MetricsPanel(metrics = activeProject.metrics)
                             ToolRegistryPanel(tools = activeProject.selectedTools, modifier = Modifier.weight(0.66f))

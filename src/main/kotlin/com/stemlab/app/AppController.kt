@@ -47,16 +47,17 @@ class AppController(
     }
 
     fun createProject(name: String, domain: String, description: String = "") {
-        val cleanDomain = domain.trim()
+        val cleanDomain = cleanSingleLine(domain, MAX_DOMAIN_LENGTH)
         if (cleanDomain.isBlank()) return
 
-        val cleanName = name.trim().ifBlank { cleanDomain }
+        val cleanName = cleanSingleLine(name, MAX_PROJECT_NAME_LENGTH).ifBlank { cleanDomain }
+        val cleanDescription = cleanSingleLine(description, MAX_DESCRIPTION_LENGTH)
         val now = Instant.now().toString()
         val project = ProjectSpec(
             id = uniqueProjectId(cleanName),
             name = cleanName,
             domain = cleanDomain,
-            description = description.trim(),
+            description = cleanDescription,
             createdAt = now,
             updatedAt = now
         )
@@ -99,14 +100,29 @@ class AppController(
         }
     }
 
-    fun setDomain(domain: String) {
+    fun updateActiveProject(name: String, domain: String, description: String? = null) {
         val project = _state.value.activeProject ?: return
         if (project.isRunning) return
 
-        val trimmed = domain.trim()
-        if (trimmed.isBlank() || trimmed == project.domain) return
+        val trimmedDomain = cleanSingleLine(domain, MAX_DOMAIN_LENGTH)
+        if (trimmedDomain.isBlank()) return
 
-        val updatedSpec = project.spec.copy(domain = trimmed, updatedAt = Instant.now().toString())
+        val trimmedName = cleanSingleLine(name, MAX_PROJECT_NAME_LENGTH).ifBlank { trimmedDomain }
+        val trimmedDescription = description
+            ?.let { cleanSingleLine(it, MAX_DESCRIPTION_LENGTH) }
+            ?: project.spec.description
+        if (
+            trimmedName == project.name &&
+            trimmedDomain == project.domain &&
+            trimmedDescription == project.spec.description
+        ) return
+
+        val updatedSpec = project.spec.copy(
+            name = trimmedName,
+            domain = trimmedDomain,
+            description = trimmedDescription,
+            updatedAt = Instant.now().toString()
+        )
         projectStore.saveProject(updatedSpec)
         updateProject(project.id) {
             it.copy(
@@ -116,10 +132,15 @@ class AppController(
                 selectedTools = emptyList(),
                 lastResult = null,
                 lastExportPath = null,
-                statusMessage = "Domain set to \"$trimmed\" — ready to run."
+                statusMessage = "Project updated — ready to run \"$trimmedDomain\"."
             )
         }
-        appendLog(project.id, "Domain changed to \"$trimmed\"")
+        appendLog(project.id, "Project updated: ${updatedSpec.name} (${updatedSpec.domain})")
+    }
+
+    fun setDomain(domain: String) {
+        val project = _state.value.activeProject ?: return
+        updateActiveProject(project.name, domain)
     }
 
     fun runEvolution() {
@@ -365,6 +386,8 @@ class AppController(
             .trim('-')
             .ifBlank { "project" }
             .take(32)
+            .trim('-')
+            .ifBlank { "project" }
         val existing = projectStore.loadProjects().map { it.id }.toSet()
         var candidate = slug
         while (candidate in existing) {
@@ -373,7 +396,18 @@ class AppController(
         return candidate
     }
 
+    private fun cleanSingleLine(value: String, maxLength: Int): String =
+        value
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(maxLength)
+            .trim()
+
     private companion object {
+        const val MAX_PROJECT_NAME_LENGTH = 80
+        const val MAX_DOMAIN_LENGTH = 160
+        const val MAX_DESCRIPTION_LENGTH = 500
+
         fun defaultLlmClient(): LlmClient {
             val apiKey = DotEnvLoader.requireApiKey()
             return OpenAiLlmClient(apiKey)

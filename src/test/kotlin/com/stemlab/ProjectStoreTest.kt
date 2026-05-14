@@ -8,6 +8,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
@@ -66,6 +67,39 @@ class ProjectStoreTest {
             assertNotNull(latest)
             assertEquals(result.runId, latest.runId)
             assertTrue(File(store.reportPath(project.id, result.runId)).path.contains(project.id))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `rejects unsafe project ids`() {
+        val (store, dir) = tempStore()
+        try {
+            assertFailsWith<IllegalArgumentException> {
+                store.saveProject(project(id = "../outside"))
+            }
+            assertFailsWith<IllegalArgumentException> {
+                store.deleteProject("../../outside")
+            }
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `rejects unsafe run ids in project paths`() {
+        val (store, dir) = tempStore()
+        try {
+            val project = project()
+            store.saveProject(project)
+
+            assertFailsWith<IllegalArgumentException> {
+                store.saveRun(project.id, result(runId = "../run"))
+            }
+            assertFailsWith<IllegalArgumentException> {
+                store.reportPath(project.id, "../report")
+            }
         } finally {
             dir.deleteRecursively()
         }
