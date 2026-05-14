@@ -38,7 +38,8 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
     var showResetDialog by remember { mutableStateOf(false) }
     var resetInput by remember { mutableStateOf("") }
     var showNewProjectDialog by remember { mutableStateOf(false) }
-    var showDeleteProjectDialog by remember { mutableStateOf(false) }
+    // Capture the specific project at click time so the dialog condition is a simple null check
+    var projectToDelete by remember { mutableStateOf<com.stemlab.app.ProjectViewState?>(null) }
     var rightPaneHeightPx by remember { mutableStateOf(1) }
     var candidatePaneFraction by remember { mutableStateOf(0.42f) }
 
@@ -68,14 +69,15 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
         )
     }
 
-    if (showDeleteProjectDialog && activeProject != null) {
+    val deletingProject = projectToDelete
+    if (deletingProject != null) {
         DeleteProjectDialog(
-            projectName = activeProject.name,
+            projectName = deletingProject.name,
             onConfirm = {
-                controller.deleteProject(activeProject.id)
-                showDeleteProjectDialog = false
+                controller.deleteProject(deletingProject.id)
+                projectToDelete = null
             },
-            onDismiss = { showDeleteProjectDialog = false }
+            onDismiss = { projectToDelete = null }
         )
     }
 
@@ -231,7 +233,7 @@ fun StemAgentLabApp(controller: AppController, onQuit: () -> Unit = {}) {
                             activeProjectId = state.activeProjectId,
                             onSelect = controller::selectProject,
                             onNewProject = { showNewProjectDialog = true },
-                            onDeleteProject = { showDeleteProjectDialog = true },
+                            onDeleteProject = { projectToDelete = activeProject },
                             modifier = Modifier.height(220.dp)
                         )
                         if (activeProject != null) {

@@ -6,15 +6,15 @@ import com.stemlab.core.model.EvolutionResult
 
 object PromptTemplates {
 
-    fun baseline(task: EvalTask): String = """
+    fun baseline(task: EvalTask, domain: String): String = """
 TASK_ID: ${task.id}
 TOOLS: (none)
-ROLE: Python code quality analyst using direct reasoning only.
+ROLE: ${domainLabel(domain)} analyst using direct reasoning only.
 
 DESCRIPTION: ${task.description}
 
 CODE:
-```python
+```
 ${task.code}
 ```
 
@@ -22,7 +22,7 @@ Analyze the code and identify any bugs, anti-patterns, or quality issues.
 Be specific about what can go wrong and under which conditions.
 """.trimIndent()
 
-    fun toolAugmented(task: EvalTask, config: AgentConfig): String {
+    fun toolAugmented(task: EvalTask, config: AgentConfig, domain: String): String {
         val toolSection = if (config.tools.isEmpty()) "(none)" else config.tools.joinToString(", ")
         val toolInvocations = config.tools.joinToString("\n") { tool ->
             "[${tool.uppercase()}] Invoking $tool on task ${task.id}..."
@@ -30,12 +30,12 @@ Be specific about what can go wrong and under which conditions.
         return """
 TASK_ID: ${task.id}
 TOOLS: $toolSection
-ROLE: Specialized Python QA agent with tool access.
+ROLE: Specialized ${domainLabel(domain)} agent with tool access.
 
 DESCRIPTION: ${task.description}
 
 CODE:
-```python
+```
 ${task.code}
 ```
 

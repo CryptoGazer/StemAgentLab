@@ -47,7 +47,7 @@ class EvolutionEngine(
 
         // 1. Baseline
         onLog("[$runId] Running Baseline Agent on ${tasks.size} tasks...")
-        val baselineAgent = BaselineAgent(llmClient)
+        val baselineAgent = BaselineAgent(llmClient, domain)
         val baselineResults = evaluator.evaluate("baseline", tasks) { task ->
             val resp = baselineAgent.runOnTask(task)
             totalTokens += resp.tokensUsed
@@ -67,7 +67,7 @@ class EvolutionEngine(
         onLog("[$runId] Generated ${candidateConfigs.size} candidates [OpenAI-parsed]: ${candidateConfigs.joinToString(", ") { it.name }}")
 
         // 3. Evaluate candidates
-        val candidatePairs = CandidateAgentBuilder(llmClient)
+        val candidatePairs = CandidateAgentBuilder(llmClient, domain)
             .buildAll(candidateConfigs)
             .take(budget.maxCandidates)
 

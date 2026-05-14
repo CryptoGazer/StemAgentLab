@@ -324,7 +324,7 @@ class AppController(
                 val generated = taskGenerator.generateWithUsage(frozen.domain)
                 appendLog(projectId, "Generated ${generated.tasks.size} tasks for re-evaluation")
 
-                val specializedAgent = SpecializedAgent(llmClient, frozen.config)
+                val specializedAgent = SpecializedAgent(llmClient, frozen.config, frozen.domain)
                 val evaluator = PythonQaEvaluator()
                 var tokensUsed = generated.tokensUsed
                 var costUsed = generated.costEstimate

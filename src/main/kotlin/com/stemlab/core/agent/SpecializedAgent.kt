@@ -8,10 +8,11 @@ import com.stemlab.llm.PromptTemplates
 
 class SpecializedAgent(
     private val llmClient: LlmClient,
-    val config: AgentConfig
+    val config: AgentConfig,
+    private val domain: String
 ) {
     suspend fun runOnTask(task: EvalTask): LlmResponse {
-        val prompt = PromptTemplates.toolAugmented(task, config)
+        val prompt = PromptTemplates.toolAugmented(task, config, domain)
         return llmClient.complete(prompt)
     }
 }

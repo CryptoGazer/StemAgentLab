@@ -6,7 +6,7 @@ import com.stemlab.llm.LlmClient
 import com.stemlab.llm.LlmResponse
 import com.stemlab.llm.PromptTemplates
 
-class BaselineAgent(private val llmClient: LlmClient) {
+class BaselineAgent(private val llmClient: LlmClient, private val domain: String) {
 
     val config = AgentConfig(
         id = "baseline",
@@ -18,7 +18,7 @@ class BaselineAgent(private val llmClient: LlmClient) {
     )
 
     suspend fun runOnTask(task: EvalTask): LlmResponse {
-        val prompt = PromptTemplates.baseline(task)
+        val prompt = PromptTemplates.baseline(task, domain)
         return llmClient.complete(prompt)
     }
 }

@@ -5,7 +5,7 @@ import com.stemlab.core.model.CandidateAgent
 import com.stemlab.core.model.CandidateStatus
 import com.stemlab.llm.LlmClient
 
-class CandidateAgentBuilder(private val llmClient: LlmClient) {
+class CandidateAgentBuilder(private val llmClient: LlmClient, private val domain: String) {
 
     fun build(config: AgentConfig): Pair<CandidateAgent, SpecializedAgent> {
         val candidate = CandidateAgent(
@@ -13,7 +13,7 @@ class CandidateAgentBuilder(private val llmClient: LlmClient) {
             config = config,
             status = CandidateStatus.PENDING
         )
-        val agent = SpecializedAgent(llmClient, config)
+        val agent = SpecializedAgent(llmClient, config, domain)
         return candidate to agent
     }
 
